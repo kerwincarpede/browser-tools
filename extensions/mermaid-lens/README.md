@@ -17,7 +17,7 @@ Keyboard (diagram focused): <kbd>F</kbd> full screen · <kbd>0</kbd> fit · <kbd
 
 ```sh
 npm install            # from the repo root
-npm run build -w mermaid-lens
+npm run build -w mermaid-lens   # or: npm run build
 ```
 
 Then load `extensions/mermaid-lens/dist`:
@@ -56,6 +56,6 @@ The e2e suite loads the built extension into Chromium and checks rendering, labe
 
 ## Releasing
 
-See [../../docs/publishing.md](../../docs/publishing.md). Store copy and permission justifications live in [store/listing.md](store/listing.md), and the privacy policy in [PRIVACY.md](PRIVACY.md).
+Run `npm run release -- mermaid-lens <patch|minor|major> --push` from the repo root, then upload the zip. See [building & versioning](../../docs/building-and-versioning.md) and [uploading to the stores](../../docs/uploading-to-the-stores.md). Store copy and permission justifications live in [store/listing.md](store/listing.md), and the privacy policy in [PRIVACY.md](PRIVACY.md).
 
 Mermaid is © Knut Sveidqvist and contributors, MIT licensed (shipped as `vendor/MERMAID-LICENSE.txt`).

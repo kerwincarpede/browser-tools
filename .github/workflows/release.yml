@@ -1,0 +1,58 @@
+name: Release
+
+# Runs when you push a tag made by `npm run release`, e.g. mermaid-lens-v0.2.0.
+on:
+  push:
+    tags: ['*-v[0-9]*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Work out extension and version from the tag
+        id: meta
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          name="${tag%-v*}"
+          version="${tag##*-v}"
+          dir="extensions/${name}"
+          if [ ! -f "${dir}/package.json" ]; then echo "::error::No extension at ${dir}"; exit 1; fi
+          pkg_version=$(node -p "require('./${dir}/package.json').version")
+          if [ "${pkg_version}" != "${version}" ]; then
+            echo "::error::Tag says ${version} but ${dir}/package.json says ${pkg_version}"; exit 1
+          fi
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and package
+        run: npm run package --workspace ${{ steps.meta.outputs.dir }}
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v v="${{ steps.meta.outputs.version }}" '
+            $0 ~ "^## " v "( |$)" {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' "${{ steps.meta.outputs.dir }}/CHANGELOG.md" > notes.md
+          printf '\n---\nUpload `%s-%s.zip` to the Chrome Web Store and Microsoft Edge Add-ons. See docs/uploading-to-the-stores.md.\n' \
+            "${{ steps.meta.outputs.name }}" "${{ steps.meta.outputs.version }}" >> notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "${{ steps.meta.outputs.dir }}/release/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.zip" \
+            --title "${{ steps.meta.outputs.name }} v${{ steps.meta.outputs.version }}" \
+            --notes-file notes.md

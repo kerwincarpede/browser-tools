@@ -1,14 +1,20 @@
 {
-  "name": "browser-extensions",
+  "name": "browser-tools",
   "private": true,
-  "description": "A home for my Chrome & Edge extensions.",
+  "description": "Chrome & Microsoft Edge extensions.",
   "workspaces": [
     "extensions/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "test": "npm test --workspaces",
     "typecheck": "npm run typecheck --workspaces",
-    "package": "npm run package --workspaces"
+    "test": "npm test --workspaces",
+    "package": "npm run package --workspaces",
+    "store-assets": "npm run store-assets --workspaces --if-present",
+    "versions": "node scripts/versions.mjs",
+    "release": "node scripts/release.mjs"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

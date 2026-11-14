@@ -1,30 +1,38 @@
-# Browser extensions
+# browser-tools
 
-Chrome & Microsoft Edge extensions, one folder per extension under `extensions/`.
+My Chrome & Microsoft Edge extensions, one folder per extension under `extensions/`.
 
 | Extension | What it does |
 | --- | --- |
 | [Mermaid Lens](extensions/mermaid-lens) | Pan, zoom, full-screen, highlight, animate and copy Mermaid diagrams on GitHub (and any site you opt into). |
 
-## Working in this repo
+## Quick start
 
 Requires Node 22+.
 
 ```sh
-npm install          # installs every extension's dependencies (npm workspaces)
-npm run build        # builds each extension into extensions/<name>/dist
-npm test             # end-to-end tests (Playwright loads the real extension)
-npm run package      # typecheck + build + zip into extensions/<name>/release/
+npm install                       # all extensions (npm workspaces)
+npx playwright install chromium   # once, for tests
+npm run build                     # → extensions/<name>/dist  (load this unpacked)
+npm test                          # end-to-end tests with the real extension loaded
 ```
 
-Run `npx playwright install chromium` once before the first `npm test`.
+## Scripts
 
-### Adding another extension
+| Command | |
+| --- | --- |
+| `npm run build` / `npm run dev -w <name>` | Compile into `dist/` (once / on every save) |
+| `npm run typecheck` | Type-check everything |
+| `npm test` | Build and run end-to-end tests |
+| `npm run package` | Validate and zip each extension for the stores → `extensions/<name>/release/` |
+| `npm run store-assets` | Regenerate store screenshots, promo tiles and logos |
+| `npm run versions` | Current versions, last release tags, unreleased changes |
+| `npm run release -- <name> <patch\|minor\|major>` | Bump version, changelog, test, zip, commit, tag (`--push` to publish a GitHub Release) |
 
-1. Create `extensions/<name>/` with its own `package.json` (`build`, `test`, `typecheck`, `package` scripts) and `manifest.json`.
-   Copying `extensions/mermaid-lens/scripts/` is the quickest start.
-2. `npm install` from the repo root picks it up automatically.
+## Docs
 
-## Publishing
-
-See [docs/publishing.md](docs/publishing.md) for registering with the Chrome Web Store and Microsoft Edge Add-ons and for each release.
+- [Getting started](docs/getting-started.md): load an extension into Chrome/Edge and the dev loop
+- [Building & versioning](docs/building-and-versioning.md): scripts, versions, releases, CI
+- [Registering store accounts](docs/registering-store-accounts.md): one-time Chrome Web Store and Edge Add-ons setup
+- [Uploading to the stores](docs/uploading-to-the-stores.md): first submission and updates
+- [Adding an extension](docs/adding-an-extension.md)

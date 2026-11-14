@@ -29,6 +29,20 @@ export const diagrams = {
   commit
   checkout main
   merge develop`,
+  showcase: `flowchart TB
+  user([User]) --> web[Web app]
+  web --> api{{API gateway}}
+  subgraph services [Services]
+    api --> auth[Auth service]
+    api --> orders[Orders service]
+    api --> search[Search service]
+  end
+  auth --> users[(Users DB)]
+  orders --> queue[[Event queue]]
+  orders --> ordersdb[(Orders DB)]
+  queue --> mailer[Email worker]
+  queue --> analytics[Analytics]
+  search --> index[(Search index)]`,
   broken: `flowchart TD
   A -->`,
 };
@@ -44,6 +58,24 @@ export function githubSection(code) {
   </div>
   <span class="js-render-enrichment-loader">Loading…</span>
 </section>`;
+}
+
+/** A single-diagram page used for store screenshots. */
+export function showcasePage(mode = 'light') {
+  const bg = mode === 'dark' ? '#0d1117' : '#ffffff';
+  const fg = mode === 'dark' ? '#e6edf3' : '#1f2328';
+  const muted = mode === 'dark' ? '#9198a1' : '#59636e';
+  const line = mode === 'dark' ? '#30363d' : '#d1d9e0';
+  return `<!doctype html><html data-color-mode="${mode}"><head><meta charset="utf-8"><title>architecture.md</title>
+<style>body{margin:0;background:${bg};color:${fg};font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.bar{display:flex;align-items:center;gap:8px;padding:14px 32px;border-bottom:1px solid ${line};color:${muted}}
+.bar b{color:${fg}}.markdown-body{max-width:1100px;margin:20px auto;padding:0 32px}
+h1{font-size:28px;margin:0 0 6px;padding-bottom:8px;border-bottom:1px solid ${line}}p{color:${muted};margin:0 0 20px}
+.label{font-size:12px}</style></head>
+<body><div class="bar">acme / shop / docs / <b>architecture.md</b></div><article class="markdown-body">
+<h1>System architecture</h1><p>How a request flows through the platform.</p>
+${githubSection(diagrams.showcase)}
+</article></body></html>`;
 }
 
 export function githubPage(mode = 'light') {
