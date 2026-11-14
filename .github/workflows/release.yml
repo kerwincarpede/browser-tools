@@ -12,8 +12,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: npm
@@ -23,6 +25,7 @@ jobs:
         id: meta
         run: |
           tag="${GITHUB_REF_NAME}"
+          if ! [[ "$tag" =~ ^[a-z0-9-]+-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::Unexpected tag ${tag}"; exit 1; fi
           name="${tag%-v*}"
           version="${tag##*-v}"
           dir="extensions/${name}"
@@ -36,29 +39,37 @@ jobs:
           echo "dir=${dir}" >> "$GITHUB_OUTPUT"
 
       - name: Build and package
-        run: npm run package --workspace ${{ steps.meta.outputs.dir }}
+        env:
+          DIR: ${{ steps.meta.outputs.dir }}
+        run: npm run package --workspace "$DIR"
 
       - name: Release notes from CHANGELOG.md
+        env:
+          NAME: ${{ steps.meta.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          DIR: ${{ steps.meta.outputs.dir }}
         run: |
-          awk -v v="${{ steps.meta.outputs.version }}" '
+          awk -v v="$VERSION" '
             $0 ~ "^## " v "( |$)" {found=1; next}
             found && /^## / {exit}
             found {print}
-          ' "${{ steps.meta.outputs.dir }}/CHANGELOG.md" > notes.md
+          ' "$DIR/CHANGELOG.md" > notes.md
           printf '\n---\nUpload `%s-%s.zip` to the Chrome Web Store and Microsoft Edge Add-ons. See docs/uploading-to-the-stores.md.\n' \
-            "${{ steps.meta.outputs.name }}" "${{ steps.meta.outputs.version }}" >> notes.md
+            "$NAME" "$VERSION" >> notes.md
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.meta.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          DIR: ${{ steps.meta.outputs.dir }}
         run: |
-          zip="${{ steps.meta.outputs.dir }}/release/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.zip"
+          zip="$DIR/release/$NAME-$VERSION.zip"
           # `npm run release -- ... --gh-release` may already have published it from a laptop.
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" "$zip" --clobber
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$zip" --clobber
             exit 0
           fi
-          gh release create "${GITHUB_REF_NAME}" \
-            "${{ steps.meta.outputs.dir }}/release/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.zip" \
-            --title "${{ steps.meta.outputs.name }} v${{ steps.meta.outputs.version }}" \
+          gh release create "$GITHUB_REF_NAME" "$zip" \
+            --title "$NAME v$VERSION" \
             --notes-file notes.md
