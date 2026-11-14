@@ -52,6 +52,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          zip="${{ steps.meta.outputs.dir }}/release/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.zip"
+          # `npm run release -- ... --gh-release` may already have published it from a laptop.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "$zip" --clobber
+            exit 0
+          fi
           gh release create "${GITHUB_REF_NAME}" \
             "${{ steps.meta.outputs.dir }}/release/${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}.zip" \
             --title "${{ steps.meta.outputs.name }} v${{ steps.meta.outputs.version }}" \

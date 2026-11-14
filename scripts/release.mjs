@@ -2,7 +2,10 @@
 // zip, commit and tag. Pushing the tag makes GitHub Actions publish a GitHub
 // Release with the zip attached (see .github/workflows/release.yml).
 //
-//   npm run release -- <extension> <patch|minor|major|x.y.z> [--dry-run] [--skip-tests] [--push]
+//   npm run release -- <extension> <patch|minor|major|x.y.z> [--dry-run] [--skip-tests] [--push] [--gh-release]
+//
+// --gh-release creates the GitHub Release from this machine (implies --push),
+// for when GitHub Actions isn't available.
 //
 // Examples:
 //   npm run release -- mermaid-lens patch --dry-run   # show what would happen
@@ -17,7 +20,7 @@ const [name, kind] = args.filter((a) => !a.startsWith('--'));
 const dryRun = flags.has('--dry-run');
 
 if (!name || !kind) {
-  console.error('Usage: npm run release -- <extension> <patch|minor|major|x.y.z> [--dry-run] [--skip-tests] [--push]');
+  console.error('Usage: npm run release -- <extension> <patch|minor|major|x.y.z> [--dry-run] [--skip-tests] [--push] [--gh-release]');
   process.exit(1);
 }
 
@@ -90,10 +93,17 @@ const zip = path.join(ext.rel, 'release', `${name}-${next}.zip`);
 console.log(`\n✓ Released ${ext.manifest.name} ${next}`);
 console.log(`  Zip for the stores: ${zip}`);
 
-if (flags.has('--push')) {
+if (flags.has('--push') || flags.has('--gh-release')) {
   run('git', ['push']);
   run('git', ['push', 'origin', tag]);
-  console.log('  Pushed. GitHub Actions will attach the zip to a GitHub Release.');
+  if (flags.has('--gh-release')) {
+    const notesFile = path.join(ext.dir, 'release', `notes-${next}.md`);
+    writeFileSync(notesFile, `${notes}\n\n---\nUpload \`${name}-${next}.zip\` to the Chrome Web Store and Microsoft Edge Add-ons. See docs/uploading-to-the-stores.md.\n`);
+    run('gh', ['release', 'create', tag, zip, '--title', `${name} v${next}`, '--notes-file', notesFile]);
+    console.log('  Pushed and published the GitHub Release.');
+  } else {
+    console.log('  Pushed. GitHub Actions will attach the zip to a GitHub Release.');
+  }
 } else {
   console.log(`  Push when ready:   git push && git push origin ${tag}`);
 }

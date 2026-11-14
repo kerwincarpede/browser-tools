@@ -53,6 +53,8 @@ npm run release -- mermaid-lens minor --push       # do it
    If either fails, the bump is reverted.
 5. Commit `release(<name>): v<version>` and create the annotated tag.
 6. With `--push`, push the commit and tag. Without it, it prints the push command.
+   With `--gh-release`, it also creates the GitHub Release from your machine
+   (needs `gh`). Use this when GitHub Actions isn't running (see below).
 
 When the tag reaches GitHub, the **Release** workflow rebuilds the zip in a clean
 environment, checks the tag matches `package.json`, and publishes a
@@ -70,6 +72,13 @@ haven't pushed yet.
 as a build artifact, and test screenshots are uploaded if a test fails.
 
 `.github/workflows/release.yml` runs on tags matching `*-v<digits>…`, as described above.
+If a release for the tag already exists (made with `--gh-release`), it just re-uploads the zip.
+
+> **Actions on a private repo** use your account's paid minutes. If a run fails
+> instantly with *"recent account payments have failed or your spending limit
+> needs to be increased"*, either fix it under GitHub → Settings → Billing and
+> plans, or make the repo public (Actions are free for public repos). Until then,
+> release with `--gh-release` and run `npm test` locally before pushing.
 
 ## What's in the zip
 
