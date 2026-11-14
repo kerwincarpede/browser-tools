@@ -339,6 +339,7 @@ await step('flowing edges and build-up replay', async () => {
   await seq.hover();
   await seq.locator('[data-act="replay"]').click(); // non-graph diagram path
   await page.waitForTimeout(3500);
+  await worker.evaluate(() => chrome.storage.sync.remove('buildDuration'));
 });
 
 await step('⋯ → Animation timing sets the flow cycle and build-up length', async () => {
