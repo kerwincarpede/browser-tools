@@ -49,15 +49,13 @@ export const BASE_CSS = /* css */ `
 .frame {
   position: relative;
   height: 240px;
-  border: 1px solid var(--ml-border);
   border-radius: 10px;
   outline: none;
-  transition: border-color 0.15s ease;
   container-type: inline-size;
 }
-.frame:hover, .frame.engaged { border-color: var(--ml-border-strong); }
-.frame:focus-visible { border-color: var(--ml-accent); }
-:host(:fullscreen) .frame { height: 100% !important; border: 0; border-radius: 0; }
+/* No border: the diagram sits directly on the page. Keyboard focus still gets a ring. */
+.frame:focus-visible:not([data-pointer]) { outline: 2px solid var(--ml-accent); outline-offset: 2px; }
+:host(:fullscreen) .frame { height: 100% !important; border-radius: 0; outline: none; }
 
 .viewport {
   position: absolute;
@@ -264,6 +262,12 @@ kbd {
 }
 .custom[aria-checked="true"] { box-shadow: 0 0 0 2px var(--ml-surface-solid), 0 0 0 4px var(--ml-hl); }
 .custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: pointer; }
+.timing + .timing { margin-top: 16px; }
+.timing .head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.timing .head h4 { margin: 0; }
+.timing output { font: 500 11.5px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; color: var(--ml-text); }
+.timing input[type="range"] { width: 100%; margin: 0; accent-color: var(--ml-accent); cursor: pointer; }
+.timing .scale { display: flex; justify-content: space-between; margin-top: 2px; font-size: 10.5px; color: var(--ml-muted); }
 .note { margin: 14px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ml-muted); }
 
 .item {
@@ -332,31 +336,44 @@ kbd {
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------- diagram: outlines ---------- */
+/* Softer than Mermaid's defaults; lit items return to full strength below. */
+svg g.node :is(rect, polygon, circle, ellipse, path, line),
+svg g.cluster > :is(rect, polygon, path),
+svg :is(rect.actor, rect.note, rect.labelBox) { stroke-opacity: 0.4; transition: stroke-opacity 0.18s ease; }
+svg g.node.ml-on :is(rect, polygon, circle, ellipse, path, line),
+svg g.cluster.ml-on > :is(rect, polygon, path) { stroke-opacity: 1; }
+
 /* ---------- diagram: highlight ---------- */
 svg .ml-hit { fill: none !important; stroke: transparent !important; stroke-width: 14px !important; pointer-events: stroke; }
-svg g.node, svg g.cluster, svg .ml-edge, svg .ml-elabel { transition: opacity 0.2s ease; }
+svg g.node, svg g.cluster, svg .ml-edge, svg .ml-elabel { transition: opacity 0.18s ease; }
+svg g.node > *, svg g.cluster > *, svg .ml-edge { transition: opacity 0.18s ease, stroke 0.18s ease, stroke-width 0.18s ease; }
 svg.ml-hl-enabled g.node, svg.ml-hl-enabled .ml-hit, svg.ml-hl-enabled .ml-elabel, svg.ml-hl-enabled .cluster-label { cursor: pointer; }
 svg.ml-has-hl g.node:not(.ml-on),
 svg.ml-has-hl .ml-edge:not(.ml-on),
-svg.ml-has-hl .ml-elabel:not(.ml-on) { opacity: 0.16; }
-svg.ml-has-hl g.cluster:not(.ml-on) { opacity: 0.5; }
+svg.ml-has-hl .ml-elabel:not(.ml-on) { opacity: 0.25; }
+svg.ml-has-hl g.cluster:not(.ml-on) { opacity: 0.55; }
 svg g.node.ml-on > :is(rect, polygon, circle, ellipse, path),
 svg g.node.ml-on > g:not(.label) :is(rect, polygon, circle, ellipse, path),
 svg g.cluster.ml-on > :is(rect, polygon, path) {
   stroke: var(--ml-hl) !important;
-  stroke-width: 2.5px !important;
+  stroke-width: 1.5px !important;
 }
+/* The hovered / pinned item: a slightly heavier outline and a faint, tight shadow — no glow. */
+svg g.node.ml-sel > :is(rect, polygon, circle, ellipse, path),
+svg g.node.ml-sel > g:not(.label) :is(rect, polygon, circle, ellipse, path),
+svg g.cluster.ml-sel > :is(rect, polygon, path) { stroke-width: 2px !important; }
 svg g.node.ml-sel, svg g.cluster.ml-sel {
-  filter: drop-shadow(0 0 1px var(--ml-hl)) drop-shadow(0 0 6px var(--ml-hl));
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--ml-hl) 22%, transparent));
 }
-svg .ml-edge.ml-on { stroke: var(--ml-hl) !important; stroke-width: 3px !important; }
-svg .ml-edge.ml-sel { stroke-width: 4px !important; }
+svg .ml-edge.ml-on { stroke: var(--ml-hl) !important; stroke-width: 2px !important; }
+svg .ml-edge.ml-sel { stroke-width: 2.5px !important; }
 
 /* ---------- diagram: flowing edges ---------- */
 svg.ml-flowing:not(.ml-has-hl) .ml-edge,
 svg.ml-flowing.ml-has-hl .ml-edge.ml-on {
   stroke-dasharray: 9 7 !important;
-  animation: ml-flow 0.8s linear infinite !important;
+  animation: ml-flow var(--ml-flow-duration, 1.5s) linear infinite !important;
 }
 @keyframes ml-flow { to { stroke-dashoffset: -16; } }
 `;

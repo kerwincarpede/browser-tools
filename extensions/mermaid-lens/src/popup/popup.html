@@ -27,9 +27,11 @@
     </section>
 
     <section class="card">
-      <h2>Highlight</h2>
+      <button id="highlight-toggle" class="row toggle hl-toggle" role="switch" aria-checked="true">
+        <span class="label">Highlight on hover<span class="sub">Click a node to pin its highlight</span></span>
+        <span class="switch"></span>
+      </button>
       <div class="seg" data-key="highlightMode">
-        <button data-val="off">Off</button>
         <button data-val="neighbors">Connected</button>
         <button data-val="flow">Full flow</button>
       </div>
@@ -55,7 +57,7 @@
     </section>
 
     <footer>
-      <span><kbd>F</kbd> full screen · <kbd>0</kbd> fit · <kbd>+</kbd><kbd>−</kbd> zoom · <kbd>Esc</kbd> clear</span>
+      <span><kbd>F</kbd> full screen · <kbd>H</kbd> highlight · <kbd>0</kbd> fit · <kbd>+</kbd><kbd>−</kbd> zoom · <kbd>Esc</kbd> clear</span>
     </footer>
     <script src="popup.js" type="module"></script>
   </body>

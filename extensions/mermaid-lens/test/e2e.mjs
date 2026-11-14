@@ -74,6 +74,17 @@ await step('labels are not clipped despite page CSS', async () => {
   assert.deepEqual(await clippedLabels(), []);
 });
 
+await step('Mermaid\'s built-in drop shadows are removed', async () => {
+  const shadowed = await viewers.evaluateAll((hosts) =>
+    hosts.flatMap((h) =>
+      [...h.shadowRoot.querySelectorAll('svg *')]
+        .filter((el) => getComputedStyle(el).filter !== 'none')
+        .map((el) => `${el.tagName}.${el.getAttribute('class')}: ${getComputedStyle(el).filter}`),
+    ),
+  );
+  assert.deepEqual(shadowed, []);
+});
+
 const flow = viewers.nth(0);
 const nodeByLabel = (v, text) => v.locator('g.node', { hasText: text }).first();
 const classesOf = (v, text) => nodeByLabel(v, text).evaluate((n) => [...n.classList].filter((c) => c.startsWith('ml-')));
@@ -87,8 +98,73 @@ await step('toolbar appears on hover', async () => {
   await flow.screenshot({ path: path.join(shots, 'flow-hover.png') });
 });
 
-await step('clicking a node highlights its direct connections', async () => {
+await step('node outlines are faint until lit', async () => {
+  const opacity = (text) =>
+    nodeByLabel(flow, text).evaluate((n) => getComputedStyle(n.querySelector('rect, polygon, circle, path')).strokeOpacity);
+  assert.equal(await opacity('Start'), '0.4');
+  await nodeByLabel(flow, 'Start').hover();
+  await page.waitForTimeout(250);
+  assert.equal(await opacity('Start'), '1');
+  const b = await flow.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y - 40);
+  await page.waitForTimeout(250);
+});
+
+await step('the diagram has no border', async () => {
+  const border = await flow.locator('.frame').evaluate((f) => getComputedStyle(f).borderTopWidth);
+  assert.equal(border, '0px');
+});
+
+await step('hovering a node highlights its connections; leaving clears it', async () => {
+  await nodeByLabel(flow, 'Is it?').hover();
+  await page.waitForTimeout(50);
+  assert.deepEqual(await classesOf(flow, 'Is it?'), ['ml-on', 'ml-sel']);
+  assert.deepEqual(await classesOf(flow, 'OK'), ['ml-on']);
+  assert.deepEqual(await classesOf(flow, 'End'), []);
+  await flow.screenshot({ path: path.join(shots, 'flow-hover-highlight.png') });
+  await nodeByLabel(flow, 'End').hover();
+  await page.waitForTimeout(50);
+  assert.deepEqual(await classesOf(flow, 'End'), ['ml-on', 'ml-sel']);
+  assert.deepEqual(await classesOf(flow, 'Is it?'), []);
+  const b = await flow.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y - 40); // off the diagram
+  await page.waitForTimeout(250);
+  assert.deepEqual(await classesOf(flow, 'End'), []);
+});
+
+await step('the toolbar button cycles Connected → Full flow → Off (H too)', async () => {
+  await flow.hover();
+  const btn = flow.locator('[data-act="cycle-highlight"]');
+  const stored = () => worker.evaluate(() => chrome.storage.sync.get(['highlight', 'highlightMode']));
+  const hoverClasses = async (hoverText, checkText) => {
+    await nodeByLabel(flow, hoverText).hover();
+    await page.waitForTimeout(50);
+    return classesOf(flow, checkText);
+  };
+  assert.equal(await btn.getAttribute('data-state'), 'neighbors', 'Connected by default');
+  assert.deepEqual(await hoverClasses('Start', 'OK'), [], 'Connected: two hops away stays dim');
+
+  await btn.click();
+  assert.equal(await btn.getAttribute('data-state'), 'flow');
+  assert.equal((await stored()).highlightMode, 'flow');
+  assert.deepEqual(await hoverClasses('Start', 'OK'), ['ml-on'], 'Full flow reaches downstream nodes');
+
+  await btn.click();
+  assert.equal(await btn.getAttribute('data-state'), 'off');
+  assert.equal((await stored()).highlight, false);
+  assert.deepEqual(await hoverClasses('Is it?', 'Is it?'), [], 'no highlight while off');
+
+  await page.keyboard.press('h');
+  await page.waitForTimeout(100);
+  assert.equal(await btn.getAttribute('data-state'), 'neighbors');
+  assert.deepEqual(await hoverClasses('Start', 'Start'), ['ml-on', 'ml-sel']);
+});
+
+await step('clicking a node pins its highlight', async () => {
   await nodeByLabel(flow, 'Is it?').click();
+  const b = await flow.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y - 40);
+  await page.waitForTimeout(250);
   assert.deepEqual(await classesOf(flow, 'Is it?'), ['ml-on', 'ml-sel']);
   for (const t of ['Start', 'OK', 'Not OK']) assert.deepEqual(await classesOf(flow, t), ['ml-on'], t);
   assert.deepEqual(await classesOf(flow, 'End'), [], 'End is two hops away');
@@ -97,8 +173,15 @@ await step('clicking a node highlights its direct connections', async () => {
   await flow.screenshot({ path: path.join(shots, 'flow-neighbors.png') });
 });
 
+const openHighlightOptions = async (v) => {
+  await v.hover();
+  await v.locator('[data-act="pop-more"]').click();
+  await v.locator('[data-act="pop-highlight"]').click();
+  await v.locator('[data-pop="highlight"].open').waitFor();
+};
+
 await step('"Full flow" lights up everything downstream and upstream', async () => {
-  await flow.locator('[data-act="pop-highlight"]').click();
+  await openHighlightOptions(flow);
   await flow.locator('[data-act="set-highlightMode"][data-val="flow"]').click();
   await page.waitForTimeout(100);
   for (const t of ['Start', 'OK', 'Not OK', 'End', 'Done']) assert.deepEqual(await classesOf(flow, t), ['ml-on'], t);
@@ -225,6 +308,7 @@ await step('download SVG produces a standalone file', async () => {
   assert.match(svg, /^<svg[^>]+xmlns="http:\/\/www.w3.org\/2000\/svg"/);
   assert.match(svg, /<style>/);
   assert.doesNotMatch(svg, /ml-hit|ml-on/);
+  assert.doesNotMatch(svg, /drop-shadow/);
 });
 
 await step('full screen toggles and refits', async () => {
@@ -238,9 +322,10 @@ await step('full screen toggles and refits', async () => {
 });
 
 await step('flowing edges and build-up replay', async () => {
+  await setStorage({ buildDuration: 3.2 }); // keep this step quick; defaults are checked below
   await flow.hover();
-  await flow.locator('[data-act="pop-animate"]').click();
   await flow.locator('[data-act="toggle-flow"]').click();
+  assert.equal(await flow.locator('[data-act="toggle-flow"]').getAttribute('aria-pressed'), 'true');
   await page.waitForTimeout(200);
   const anim = await flow.locator('path.ml-edge').first().evaluate((p) => getComputedStyle(p).animationName);
   assert.equal(anim, 'ml-flow');
@@ -252,10 +337,38 @@ await step('flowing edges and build-up replay', async () => {
   assert.equal(after, 'ml-flow', 'flowing resumes after replay');
   const seq = viewers.nth(1);
   await seq.hover();
-  await seq.locator('[data-act="pop-animate"]').click();
   await seq.locator('[data-act="replay"]').click(); // non-graph diagram path
   await page.waitForTimeout(3500);
-  await setStorage({ flowAnimation: false });
+});
+
+await step('⋯ → Animation timing sets the flow cycle and build-up length', async () => {
+  await flow.hover();
+  await flow.locator('[data-act="pop-more"]').click();
+  await flow.locator('[data-act="pop-timing"]').click();
+  await flow.locator('[data-pop="timing"].open').waitFor();
+  assert.equal(await flow.locator('output[data-out="flowDuration"]').textContent(), '1.5s', 'default flow cycle');
+  assert.equal(await flow.locator('output[data-out="buildDuration"]').textContent(), '8.0s', 'default build-up');
+  const setSlider = (key, v) =>
+    flow.locator(`input[data-timing="${key}"]`).evaluate((r, v) => {
+      r.value = String(v);
+      r.dispatchEvent(new Event('input', { bubbles: true }));
+      r.dispatchEvent(new Event('change', { bubbles: true }));
+    }, v);
+  await setSlider('flowDuration', 2);
+  await setSlider('buildDuration', 1);
+  await page.waitForTimeout(200);
+  assert.equal(await flow.locator('output[data-out="flowDuration"]').textContent(), '2.0s');
+  const dur = await flow.locator('path.ml-edge').first().evaluate((p) => getComputedStyle(p).animationDuration);
+  assert.equal(dur, '2s');
+  const stored = await worker.evaluate(() => chrome.storage.sync.get(['flowDuration', 'buildDuration']));
+  assert.deepEqual(stored, { flowDuration: 2, buildDuration: 1 });
+  await page.keyboard.press('Escape');
+  // A 1s build-up finishes well before the default 8s one would.
+  await flow.locator('[data-act="replay"]').click();
+  await page.waitForTimeout(1600);
+  const running = await flow.evaluate((h) => h.shadowRoot.querySelector('svg').getAnimations({ subtree: true }).filter((a) => !(a instanceof CSSAnimation)).length);
+  assert.equal(running, 0, 'build-up finished early');
+  await worker.evaluate(() => chrome.storage.sync.remove(['flowAnimation', 'flowDuration', 'buildDuration']));
 });
 
 await step('"Enabled on this site" switch restores GitHub’s originals; popup toggle brings it back', async () => {
@@ -277,11 +390,19 @@ await step('dark mode page renders with the dark theme', async () => {
   await page.goto('https://github.com/mermaid-lens-test/readme?mode=dark');
   await viewers.nth(3).waitFor({ timeout: 20000 });
   assert.equal(await viewers.first().getAttribute('data-ui'), 'dark');
+  const strokes = await viewers.evaluateAll((hosts) =>
+    hosts.flatMap((h) =>
+      [...h.shadowRoot.querySelectorAll('g.node *, g.cluster > rect, rect.actor')]
+        .map((el) => getComputedStyle(el).stroke)
+        .filter((s) => s.startsWith('url(')),
+    ),
+  );
+  assert.deepEqual(strokes, [], 'node borders are solid, not gradients');
   await viewers.first().hover();
   await nodeByLabel(viewers.first(), 'Not OK').click();
   await page.waitForTimeout(300);
   await viewers.first().screenshot({ path: path.join(shots, 'flow-dark.png') });
-  await viewers.first().locator('[data-act="pop-highlight"]').click();
+  await openHighlightOptions(viewers.first());
   await page.waitForTimeout(200);
   await page.screenshot({ path: path.join(shots, 'dark-popover.png'), clip: { x: 0, y: 0, width: 1200, height: 560 } });
 });

@@ -13,7 +13,15 @@ export interface Rendered {
 
 async function renderOnce(code: string, theme: string, securityLevel: 'sandbox' | 'strict'): Promise<Rendered> {
   const id = `mlens-${Date.now().toString(36)}-${counter++}`;
-  mermaid.initialize({ startOnLoad: false, securityLevel, suppressErrorRendering: true, theme: theme as never });
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel,
+    suppressErrorRendering: true,
+    theme: theme as never,
+    // Mermaid 12's dark themes stroke node borders with a gradient and add grey
+    // drop shadows; we want plain, solid borders.
+    themeVariables: { useGradient: false, dropShadow: '' },
+  });
   try {
     const { svg, diagramType } = await mermaid.render(id, code);
     return { svg, diagramType };

@@ -3,15 +3,15 @@
 A Chrome / Edge extension that gives Mermaid diagrams on GitHub (and any site you opt into) a proper viewer.
 
 - **Hides GitHub's built-in diagram frame and controls** and redraws the diagram with the bundled Mermaid (v12).
-- **Hover toolbar** (top-right): highlight · animate · copy/export · full screen · more. Zoom controls bottom-right.
+- **Hover toolbar** (top-right): highlight mode · flowing edges · replay build-up · copy/export · full screen · more. Zoom controls bottom-right. The diagram itself is drawn borderless, with solid, softened node outlines and no drop shadows.
 - **Pan & zoom**: drag to pan; <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll or trackpad pinch to zoom; plain scrolling still scrolls the page. In full screen, the scroll wheel zooms and trackpad scrolling pans.
-- **Highlight**: click a node or arrow. *Connected* lights up direct neighbours; *Full flow* lights up everything upstream and/or downstream. <kbd>Shift</kbd>-click to add more, <kbd>Esc</kbd> to clear. Works for flowcharts, state, class and ER diagrams.
+- **Highlight** (on by default): hover a node or arrow. *Connected* lights up direct neighbours; *Full flow* lights up everything upstream and/or downstream. Click to pin a highlight, <kbd>Shift</kbd>-click to pin more, <kbd>Esc</kbd> to unpin. The toolbar's highlight button (or <kbd>H</kbd>) cycles *Connected* → *Full flow* → *Off*; direction and colour live under ⋯ → *Highlight options*. Works for flowcharts, state, class and ER diagrams.
 - **Highlight colour**: 8 presets plus a custom picker, synced across diagrams and devices.
-- **Animate**: *Flowing edges* (marching dashes in the arrow direction; only on highlighted edges while something is highlighted) and *Replay build-up* (nodes appear level by level while edges draw themselves).
+- **Animate**: *Flowing edges* (marching dashes in the arrow direction; only on highlighted edges while something is highlighted) and *Replay build-up* (nodes appear level by level while edges draw themselves). Both have toolbar buttons; ⋯ → *Animation timing* sets the dash cycle (0.2–3 s) and the build-up length (1–10 s).
 - **Copy**: Mermaid code, PNG image, SVG markup; download PNG/SVG; open in Mermaid Live Editor.
 - **Per-site switch**: ⋯ menu → *Enabled on github.com*. Turn it back on from the extension icon's popup, which also enables other sites and sets defaults.
 
-Keyboard (diagram focused): <kbd>F</kbd> full screen · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>−</kbd> zoom · arrows pan · <kbd>Esc</kbd> clear.
+Keyboard (diagram focused): <kbd>F</kbd> full screen · <kbd>H</kbd> cycle highlight mode · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>−</kbd> zoom · arrows pan · <kbd>Esc</kbd> unpin.
 
 ## Try it locally
 

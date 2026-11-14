@@ -65,7 +65,8 @@ class MermaidLens {
     this.observer = new MutationObserver(() => {
       if (!this.scanTimer) this.scanTimer = window.setTimeout(() => this.scan(), 200);
     });
-    this.observer.observe(document.body ?? document.documentElement, { childList: true, subtree: true });
+    // Observe <html>, not <body>: GitHub's Turbo navigations replace <body> wholesale.
+    this.observer.observe(document.documentElement, { childList: true, subtree: true });
     this.scan();
   }
 

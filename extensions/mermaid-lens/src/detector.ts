@@ -35,7 +35,18 @@ async function start() {
     }
     requested = true;
     observer.disconnect();
-    send({ type: 'ml:inject' });
+    chrome.runtime
+      .sendMessage<Message, { ok: boolean; error?: string } | undefined>({ type: 'ml:inject' })
+      .then((res) => {
+        if (res?.ok) return;
+        throw new Error(res?.error ?? 'no response from service worker');
+      })
+      .catch((err) => {
+        // Let a later DOM change (or settings change) try again instead of giving up for good.
+        console.warn('[Mermaid Lens] could not load the enhancer:', err);
+        requested = false;
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      });
   };
 
   const observer = new MutationObserver(() => {

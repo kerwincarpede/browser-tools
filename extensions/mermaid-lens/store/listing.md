@@ -49,5 +49,5 @@ Does not collect or use any user data.
 ## Test instructions (Edge "Notes for certification")
 1. Open https://github.com/mermaid-js/mermaid/blob/develop/README.md
 2. Hover a diagram: a toolbar appears top-right. Drag to pan, Ctrl+scroll to zoom.
-3. Click a node to highlight its connections. Use the toolbar to change colour, animate, copy, or go full screen.
+3. Hover a node to highlight its connections (click to pin). Use the toolbar to change colour, animate, copy, or go full screen.
 4. Toolbar ⋯ menu → "Enabled on github.com" switches it off. Re-enable from the extension's toolbar icon.

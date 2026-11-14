@@ -1,5 +1,5 @@
-import { PALETTE, type Settings } from '../shared/settings';
-import { BuildAnimation } from './animate';
+import { PALETTE, TIMING, type Settings } from '../shared/settings';
+import { BASE_BUILD_SECONDS, BuildAnimation } from './animate';
 import * as exporter from './export';
 import { extractGraph, type GEdge, type GNode, type Graph } from './graph';
 import { Highlighter } from './highlight';
@@ -19,6 +19,9 @@ export interface ViewerContext {
 const PAD = 16;
 const MIN_HEIGHT = 140;
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
+const HINT = `Drag to pan · <kbd>${MOD}</kbd> + scroll to zoom · Hover to highlight, click to pin`;
+/** Grace period before un-highlighting, so crossing a gap between shapes doesn't flicker. */
+const HOVER_OUT_MS = 90;
 
 let baseSheet: CSSStyleSheet | undefined;
 function getBaseSheet(): CSSStyleSheet {
@@ -29,10 +32,45 @@ function getBaseSheet(): CSSStyleSheet {
   return baseSheet;
 }
 
+/**
+ * Mermaid 12's themes give nodes, clusters and actors a fixed light-grey drop
+ * shadow (even on dark backgrounds), via CSS and via `<filter>` elements.
+ * Flatten them, and gradient-stroked borders too: the diagram should sit
+ * cleanly on the page with solid outlines.
+ */
+const SHADOW_CSS = /filter\s*:\s*(?:drop-shadow\([^;}]*|url\([^)]*shadow[^)]*\))\s*;?/gi;
+function flattenStyles(svg: SVGSVGElement, css: string): string {
+  const shadowFilters = [...svg.querySelectorAll('filter')].filter((f) => /shadow/i.test(f.id));
+  const ids = new Set(shadowFilters.map((f) => f.id));
+  shadowFilters.forEach((f) => f.remove());
+  const isShadow = (v: string) => /drop-shadow\(/i.test(v) || [...ids].some((id) => v.includes(`#${id}`));
+  for (const el of svg.querySelectorAll<SVGElement>('[filter], [style*="filter"]')) {
+    const attr = el.getAttribute('filter');
+    if (attr && isShadow(attr)) el.removeAttribute('filter');
+    const inline = el.style.getPropertyValue('filter');
+    if (inline && isShadow(inline)) el.style.removeProperty('filter');
+  }
+  css = css.replace(SHADOW_CSS, 'filter: none;');
+
+  // Gradient-stroked borders (diagrams the page rendered itself): use a solid colour instead.
+  for (const g of svg.querySelectorAll('linearGradient, radialGradient')) {
+    if (!/gradient$/i.test(g.id)) continue;
+    const colour = g.querySelector('stop')?.getAttribute('stop-color');
+    if (!colour) continue;
+    const ref = new RegExp(`url\\(\\s*["']?#${g.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*\\)`, 'g');
+    css = css.replace(ref, colour);
+  }
+  return css;
+}
+
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-type PopName = 'highlight' | 'animate' | 'copy' | 'more';
+const HL_LABEL = { neighbors: 'Connected', flow: 'Full flow', off: 'Off' } as const;
+
+type PopName = 'highlight' | 'timing' | 'copy' | 'more';
+type TimingKey = keyof typeof TIMING;
+const secs = (v: number) => `${v.toFixed(1)}s`;
 
 export class DiagramViewer {
   readonly host = document.createElement(HOST_TAG);
@@ -68,6 +106,7 @@ export class DiagramViewer {
   private pinch?: { d0: number; k0: number; cx: number; cy: number; x0: number; y0: number };
   private hintTimer = 0;
   private toastTimer = 0;
+  private hoverTimer = 0;
   private hintShownAt = 0;
   private ro?: ResizeObserver;
   private prevDisplay: [string, string] = ['', ''];
@@ -168,6 +207,12 @@ export class DiagramViewer {
     const canCode = this.source.code !== undefined;
     const item = (act: string, ic: Parameters<typeof icon>[0], label: string, sub = '', extra = '') =>
       `<button class="item" data-act="${act}" ${extra}>${icon(ic)}<span class="label">${label}${sub ? `<span class="sub">${sub}</span>` : ''}</span></button>`;
+    const slider = (key: TimingKey, label: string, lo: string, hi: string) => {
+      const { min, max, step } = TIMING[key];
+      return `<div class="timing"><div class="head"><h4>${label}</h4><output data-out="${key}"></output></div>
+        <input type="range" data-timing="${key}" min="${min}" max="${max}" step="${step}" aria-label="${label} duration">
+        <div class="scale"><span>${lo}</span><span>${hi}</span></div></div>`;
+    };
     const seg = (group: string, opts: [string, string][]) =>
       `<div class="seg" role="radiogroup" data-group="${group}">${opts
         .map(([v, l]) => `<button role="radio" data-act="set-${group}" data-val="${v}">${l}</button>`)
@@ -179,8 +224,9 @@ export class DiagramViewer {
         <div class="viewport"></div>
 
         <div class="ui bar toolbar" role="toolbar" aria-label="Diagram tools">
-          <button class="btn" data-act="pop-highlight" data-tip="Highlight" aria-expanded="false">${icon('highlight')}<span class="dot"></span></button>
-          <button class="btn" data-act="pop-animate" data-tip="Animate" aria-expanded="false">${icon('play')}</button>
+          <button class="btn" data-act="cycle-highlight" data-state="neighbors" data-tip="Highlight: Connected (H)" aria-label="Highlight: Connected">${icon('highlight')}<span class="dot"></span></button>
+          <button class="btn" data-act="toggle-flow" data-tip="Flowing edges" aria-pressed="false">${icon('waves')}</button>
+          <button class="btn" data-act="replay" data-tip="Replay build-up">${icon('replay')}</button>
           <button class="btn" data-act="pop-copy" data-tip="Copy &amp; export" aria-expanded="false">${icon('copy')}</button>
           <span class="sep"></span>
           <button class="btn" data-act="fullscreen" data-tip="Full screen (F)">${icon('expand')}</button>
@@ -198,8 +244,8 @@ export class DiagramViewer {
         <div class="hint"></div>
 
         <div class="pop" data-pop="highlight" role="dialog" aria-label="Highlight options">
-          <h4>Highlight on click</h4>
-          ${seg('highlightMode', [['off', 'Off'], ['neighbors', 'Connected'], ['flow', 'Full flow']])}
+          <h4>Highlight</h4>
+          ${seg('highlightMode', [['neighbors', 'Connected'], ['flow', 'Full flow']])}
           <div class="row">
             <h4>Direction</h4>
             ${seg('direction', [['both', 'Both'], ['down', 'Downstream'], ['up', 'Upstream']])}
@@ -211,12 +257,13 @@ export class DiagramViewer {
               <label class="custom" data-tip="Custom colour"><input type="color" aria-label="Custom colour"></label>
             </div>
           </div>
-          <p class="note">Click a node or arrow to light up what it connects to. <kbd>Shift</kbd>-click to add more, <kbd>Esc</kbd> or click empty space to clear.</p>
+          <p class="note">Hover a node or arrow to light up what it connects to. Click to pin it, <kbd>Shift</kbd>-click to pin more, <kbd>Esc</kbd> or click empty space to unpin.</p>
         </div>
 
-        <div class="pop menu" data-pop="animate" role="menu">
-          <button class="item" role="switch" data-act="toggle-flow" aria-checked="false">${icon('waves')}<span class="label">Flowing edges<span class="sub">Animate arrows in their direction</span></span><span class="switch"></span></button>
-          ${item('replay', 'replay', 'Replay build-up', 'Draw the diagram step by step')}
+        <div class="pop" data-pop="timing" role="dialog" aria-label="Animation timing">
+          ${slider('flowDuration', 'Flowing edges', 'Fast', 'Slow')}
+          ${slider('buildDuration', 'Build-up replay', 'Quick', 'Leisurely')}
+          <p class="note">Flowing edges: time for one dash cycle. Build-up: roughly how long the whole diagram takes to draw.</p>
         </div>
 
         <div class="pop menu" data-pop="copy" role="menu">
@@ -229,6 +276,8 @@ export class DiagramViewer {
         </div>
 
         <div class="pop menu" data-pop="more" role="menu">
+          ${item('pop-highlight', 'highlight', 'Highlight options', 'Mode, direction and colour')}
+          ${item('pop-timing', 'clock', 'Animation timing', 'Flowing edges and build-up speed')}
           ${item('open-live', 'external', 'Open in Mermaid Live Editor', '', canCode ? '' : 'disabled')}
           ${item('fit', 'reset', 'Reset view')}
           <div class="divider"></div>
@@ -244,7 +293,7 @@ export class DiagramViewer {
     this.zoomLabel = $('.zoom-label');
     this.hint = $('.hint');
     this.toastEl = $('.toast');
-    this.hint.innerHTML = `Drag to pan · <kbd>${MOD}</kbd> + scroll to zoom · Click a node to highlight`;
+    this.hint.innerHTML = HINT;
     this.root.querySelectorAll<HTMLElement>('.swatch').forEach((s) => s.style.setProperty('--c', s.dataset.color!));
 
     this.host.dataset.ui = this.dark ? 'dark' : 'light';
@@ -257,6 +306,8 @@ export class DiagramViewer {
     this.viewport.addEventListener('pointermove', (e) => this.onPointerMove(e));
     this.viewport.addEventListener('pointerup', (e) => this.onPointerUp(e));
     this.viewport.addEventListener('pointercancel', (e) => this.onPointerUp(e));
+    this.viewport.addEventListener('pointerover', (e) => this.onHover(e));
+    this.viewport.addEventListener('pointerleave', () => this.setHover(null));
     this.viewport.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     this.viewport.addEventListener('dblclick', (e) => {
       if ((e.target as Element).closest('g.node, .ml-hit, g.edgeLabel')) return;
@@ -267,6 +318,12 @@ export class DiagramViewer {
     const colorInput = $<HTMLInputElement>('.custom input');
     colorInput.addEventListener('input', () => this.ctx.update({ highlightColor: colorInput.value }, false));
     colorInput.addEventListener('change', () => this.ctx.update({ highlightColor: colorInput.value }));
+
+    this.root.querySelectorAll<HTMLInputElement>('input[data-timing]').forEach((r) => {
+      const patch = () => ({ [r.dataset.timing as TimingKey]: Number(r.value) });
+      r.addEventListener('input', () => this.ctx.update(patch(), false)); // live preview while dragging
+      r.addEventListener('change', () => this.ctx.update(patch()));
+    });
 
     const onFs = () => {
       const fs = document.fullscreenElement === this.host;
@@ -291,8 +348,8 @@ export class DiagramViewer {
     // Mermaid ships its styles in an inline <style>. Move them to a constructable
     // stylesheet so they survive strict CSPs (selectors are scoped by the svg id).
     const styles = [...svg.querySelectorAll('style')];
-    this.styleText = styles.map((s) => s.textContent ?? '').join('\n');
     styles.forEach((s) => s.remove());
+    this.styleText = flattenStyles(svg, styles.map((s) => s.textContent ?? '').join('\n'));
     try {
       this.diagramSheet.replaceSync(this.styleText.replace(/@import[^;]+;/g, ''));
     } catch {
@@ -333,7 +390,6 @@ export class DiagramViewer {
       b.setAttribute('aria-checked', String(b.dataset.val === s.highlightMode)),
     );
     q('[data-group="direction"] button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.val === s.direction)));
-    q('[data-group="direction"]').forEach((g) => g.classList.toggle('disabled', s.highlightMode === 'off'));
     let matched = false;
     q('.swatch').forEach((b) => {
       const on = b.dataset.color!.toLowerCase() === s.highlightColor.toLowerCase();
@@ -345,13 +401,30 @@ export class DiagramViewer {
     const input = custom.querySelector('input')!;
     if (/^#[0-9a-f]{6}$/i.test(s.highlightColor)) input.value = s.highlightColor;
 
-    q('[data-act="pop-highlight"]').forEach((b) => b.classList.toggle('on', s.highlightMode !== 'off'));
-    q('[data-act="pop-animate"]').forEach((b) => b.classList.toggle('on', s.flowAnimation));
-    q('[data-act="toggle-flow"]').forEach((b) => b.setAttribute('aria-checked', String(s.flowAnimation)));
+    q('[data-act="cycle-highlight"]').forEach((b) => {
+      const state = s.highlight ? s.highlightMode : 'off';
+      if (b.dataset.state !== state) {
+        b.dataset.state = state;
+        b.innerHTML = `${icon(state === 'flow' ? 'flow' : 'highlight')}<span class="dot"></span>`;
+      }
+      b.classList.toggle('on', s.highlight);
+      b.dataset.tip = `Highlight: ${HL_LABEL[state]} (H)`;
+      b.setAttribute('aria-label', `Highlight: ${HL_LABEL[state]}`);
+    });
+    q('[data-act="toggle-flow"]').forEach((b) => {
+      b.classList.toggle('on', s.flowAnimation);
+      b.setAttribute('aria-pressed', String(s.flowAnimation));
+      b.dataset.tip = s.flowAnimation ? 'Flowing edges: on' : 'Flowing edges: off';
+    });
+    this.host.style.setProperty('--ml-flow-duration', `${s.flowDuration}s`);
+    for (const key of Object.keys(TIMING) as TimingKey[]) {
+      q(`input[data-timing="${key}"]`).forEach((r) => ((r as HTMLInputElement).value = String(s[key])));
+      q(`output[data-out="${key}"]`).forEach((o) => (o.textContent = secs(s[key])));
+    }
 
     this.svg?.classList.toggle('ml-flowing', s.flowAnimation);
-    this.svg?.classList.toggle('ml-hl-enabled', s.highlightMode !== 'off');
-    this.highlighter?.configure(s.highlightMode, s.direction);
+    this.svg?.classList.toggle('ml-hl-enabled', s.highlight);
+    this.highlighter?.configure(s.highlight, s.highlightMode, s.direction);
 
     if (prev && prev.theme !== s.theme) void this.refreshTheme();
   }
@@ -464,8 +537,7 @@ export class DiagramViewer {
   }
 
   private flashHint(html: string | null, ms = 1800) {
-    if (html) this.hint.innerHTML = html;
-    else this.hint.innerHTML = `Drag to pan · <kbd>${MOD}</kbd> + scroll to zoom · Click a node to highlight`;
+    this.hint.innerHTML = html ?? HINT;
     this.hintShownAt = performance.now();
     this.hint.classList.add('show');
     clearTimeout(this.hintTimer);
@@ -475,6 +547,7 @@ export class DiagramViewer {
   private onPointerDown(e: PointerEvent) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     this.closePop();
+    this.frame.dataset.pointer = '';
     this.frame.focus({ preventScroll: true });
     this.viewport.setPointerCapture(e.pointerId);
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -560,6 +633,7 @@ export class DiagramViewer {
   }
 
   private onKey(e: KeyboardEvent) {
+    delete this.frame.dataset.pointer;
     if (e.target instanceof HTMLInputElement || e.altKey || e.ctrlKey || e.metaKey) return;
     const pan = (dx: number, dy: number) => {
       this.view.x += dx;
@@ -582,6 +656,10 @@ export class DiagramViewer {
       case 'f':
       case 'F':
         void this.toggleFullscreen();
+        break;
+      case 'h':
+      case 'H':
+        this.cycleHighlight();
         break;
       case 'Escape':
         if (this.openPop) this.closePop();
@@ -615,14 +693,41 @@ export class DiagramViewer {
     this.graph = extractGraph(this.svg);
     if (this.graph) {
       const s = this.ctx.settings();
-      this.highlighter = new Highlighter(this.svg, this.graph, s.highlightMode, s.direction);
+      this.highlighter = new Highlighter(this.svg, this.graph, s.highlight, s.highlightMode, s.direction);
     }
     return this.graph;
   }
 
+  private onHover(e: PointerEvent) {
+    // Touch has no hover (a tap pins instead); ignore pointers mid-drag or mid-pinch.
+    if (e.pointerType === 'touch' || this.pointers.size || !this.ctx.settings().highlight) return;
+    const graph = this.ensureGraph();
+    if (!graph || !(e.target instanceof Element)) return;
+    this.setHover(this.hitTest(e.target, graph));
+  }
+
+  private setHover(item: GNode | GEdge | null) {
+    clearTimeout(this.hoverTimer);
+    if (item) this.highlighter?.hover(item);
+    else this.hoverTimer = window.setTimeout(() => this.highlighter?.hover(null), HOVER_OUT_MS);
+  }
+
+  /** Toolbar button / H: Connected → Full flow → Off → Connected. */
+  private cycleHighlight() {
+    const s = this.ctx.settings();
+    const patch: Partial<Settings> = !s.highlight
+      ? { highlight: true, highlightMode: 'neighbors' }
+      : s.highlightMode === 'neighbors'
+        ? { highlightMode: 'flow' }
+        : { highlight: false };
+    this.ctx.update(patch);
+    const next = { ...s, ...patch };
+    this.toast(`Highlight: ${HL_LABEL[next.highlight ? next.highlightMode : 'off']}`);
+  }
+
   private onTap(target: EventTarget | null, e: PointerEvent) {
     const s = this.ctx.settings();
-    if (s.highlightMode === 'off' || !(target instanceof Element)) return;
+    if (!s.highlight || !(target instanceof Element)) return;
     const graph = this.ensureGraph();
     if (!graph || !this.highlighter) return;
     const item = this.hitTest(target, graph);
@@ -648,12 +753,17 @@ export class DiagramViewer {
     const act = btn.dataset.act!;
     if (act.startsWith('pop-')) {
       const name = act.slice(4) as PopName;
+      // Popovers opened from a menu item hang off the toolbar button that opened the menu.
+      const anchor = btn.closest('.pop') ? this.root.querySelector<HTMLElement>(`[data-act="pop-${this.openPop}"]`)! : btn;
       if (this.openPop === name) this.closePop();
-      else this.showPop(name, btn);
+      else this.showPop(name, anchor);
       return;
     }
     const s = this.ctx.settings();
     switch (act) {
+      case 'cycle-highlight':
+        this.cycleHighlight();
+        break;
       case 'set-highlightMode':
         this.ctx.update({ highlightMode: btn.dataset.val as Settings['highlightMode'] });
         break;
@@ -734,7 +844,12 @@ export class DiagramViewer {
     if (!svg || !this.build) return;
     const flowing = svg.classList.contains('ml-flowing');
     svg.classList.remove('ml-flowing'); // its !important dash styles would fight the draw-in
-    this.build.play(this.ensureGraph(), () => svg.classList.toggle('ml-flowing', this.ctx.settings().flowAnimation));
+    const s = this.ctx.settings();
+    this.build.play(
+      this.ensureGraph(),
+      () => svg.classList.toggle('ml-flowing', this.ctx.settings().flowAnimation),
+      s.buildDuration / BASE_BUILD_SECONDS,
+    );
     if (flowing) this.toast('Replaying…');
   }
 
@@ -771,6 +886,7 @@ export class DiagramViewer {
     btn.setAttribute('aria-expanded', 'true');
     this.frame.classList.add('engaged');
     this.openPop = name;
+    this.popAnchor = btn;
 
     const outside = (ev: Event) => {
       if (!ev.composedPath().some((n) => n === pop || n === btn)) this.closePop();
@@ -781,11 +897,13 @@ export class DiagramViewer {
   }
 
   private popCleanup?: () => void;
+  private popAnchor?: HTMLElement;
 
   private closePop() {
     if (!this.openPop) return;
     this.root.querySelector(`[data-pop="${this.openPop}"]`)?.classList.remove('open');
-    this.root.querySelector(`[data-act="pop-${this.openPop}"]`)?.setAttribute('aria-expanded', 'false');
+    this.popAnchor?.setAttribute('aria-expanded', 'false');
+    this.popAnchor = undefined;
     this.frame.classList.remove('engaged');
     this.popCleanup?.();
     this.popCleanup = undefined;

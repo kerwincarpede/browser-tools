@@ -1,5 +1,8 @@
 import type { GNode, Graph } from './graph';
 
+/** Rough length, in seconds, of a build-up at `scale` 1 (the timings below are tuned for it). */
+export const BASE_BUILD_SECONDS = 3.2;
+
 /**
  * "Build-up" replay: nodes fade in level by level (breadth-first from the
  * diagram's sources) and edges draw themselves from source to target.
@@ -9,6 +12,8 @@ export class BuildAnimation {
   private running: Animation[] = [];
   private timers: number[] = [];
   private restore: (() => void)[] = [];
+
+  private scale = 1;
 
   constructor(private svg: SVGSVGElement) {}
 
@@ -25,8 +30,10 @@ export class BuildAnimation {
     this.restore = [];
   }
 
-  play(graph: Graph | null, onDone?: () => void) {
+  /** `scale` stretches or shrinks every delay and duration (1 ≈ BASE_BUILD_SECONDS). */
+  play(graph: Graph | null, onDone?: () => void, scale = 1) {
     this.stop();
+    this.scale = scale;
     const total = graph ? this.playGraph(graph) : this.playGeneric();
     this.timers.push(window.setTimeout(() => {
       this.stop();
@@ -43,7 +50,7 @@ export class BuildAnimation {
   private playGraph(graph: Graph): number {
     const level = levels(graph);
     const maxLevel = Math.max(0, ...level.values());
-    const step = Math.min(520, Math.max(160, 3200 / (maxLevel + 1)));
+    const step = Math.min(520, Math.max(160, 3200 / (maxLevel + 1))) * this.scale;
 
     for (const n of graph.nodes) {
       if (n.cluster) this.fade(n.el, 0, step * 2);
@@ -85,9 +92,10 @@ export class BuildAnimation {
     let items = [...this.svg.children].filter((c) => !/^(style|defs|title|desc)$/i.test(c.tagName));
     if (items.length === 1 && root.children.length > 1) items = [...root.children];
     items = items.slice(0, 400);
-    const step = Math.min(220, Math.max(12, 2600 / Math.max(1, items.length)));
-    items.forEach((el, i) => this.fade(el, i * step, Math.max(180, step * 2)));
-    return items.length * step + Math.max(180, step * 2);
+    const step = Math.min(220, Math.max(12, 2600 / Math.max(1, items.length))) * this.scale;
+    const duration = Math.max(180 * this.scale, step * 2);
+    items.forEach((el, i) => this.fade(el, i * step, duration));
+    return items.length * step + duration;
   }
 }
 

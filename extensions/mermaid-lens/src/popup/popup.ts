@@ -92,6 +92,9 @@ async function main() {
     });
   });
 
+  const hlToggle = $<HTMLButtonElement>('highlight-toggle');
+  hlToggle.addEventListener('click', () => void saveSettings({ highlight: !settings.highlight }));
+
   const flow = $<HTMLButtonElement>('flow-toggle');
   flow.addEventListener('click', () => void saveSettings({ flowAnimation: !settings.flowAnimation }));
 
@@ -104,7 +107,9 @@ async function main() {
       const current = String(settings[seg.dataset.key as keyof Settings]);
       seg.querySelectorAll<HTMLElement>('button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.val === current)));
     });
-    document.querySelector('.seg[data-key="direction"]')!.classList.toggle('disabled', settings.highlightMode === 'off');
+    hlToggle.setAttribute('aria-checked', String(settings.highlight));
+    document.querySelectorAll('.seg').forEach((seg) => seg.classList.toggle('disabled', !settings.highlight));
+    swatches.classList.toggle('disabled', !settings.highlight);
     let matched = false;
     swatches.querySelectorAll<HTMLElement>('.swatch').forEach((b) => {
       const on = b.dataset.color!.toLowerCase() === settings.highlightColor.toLowerCase();

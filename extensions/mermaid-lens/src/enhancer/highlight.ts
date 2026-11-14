@@ -6,64 +6,91 @@ import type { Direction, HighlightMode } from '../shared/settings';
  * (see styles.ts) keyed off these classes plus the `--ml-hl` custom property.
  */
 export class Highlighter {
-  private sel: Selection = { nodes: new Set(), edges: new Set() };
+  /** Clicked items; they stay lit until cleared and take precedence over hover. */
+  private pinned: Selection = { nodes: new Set(), edges: new Set() };
+  private hovered: GNode | GEdge | null = null;
   private lit = { nodes: new Set<GNode>(), edges: new Set<GEdge>() };
   private markerClones = new Map<string, string>();
 
   constructor(
     private svg: SVGSVGElement,
     private graph: Graph,
+    private enabled: boolean,
     private mode: HighlightMode,
     private direction: Direction,
   ) {}
 
+  /** Whether anything is pinned (Esc clears pins before doing anything else). */
   get active(): boolean {
-    return this.sel.nodes.size + this.sel.edges.size > 0;
+    return this.pinned.nodes.size + this.pinned.edges.size > 0;
   }
 
-  configure(mode: HighlightMode, direction: Direction) {
-    if (mode === this.mode && direction === this.direction) return;
+  configure(enabled: boolean, mode: HighlightMode, direction: Direction) {
+    if (enabled === this.enabled && mode === this.mode && direction === this.direction) return;
+    this.enabled = enabled;
     this.mode = mode;
     this.direction = direction;
-    if (mode === 'off') this.clear();
-    else this.apply();
-  }
-
-  /** Select a node or edge; `additive` (shift-click) toggles it within the selection. */
-  select(item: GNode | GEdge, additive: boolean) {
-    const set = (item.kind === 'node' ? this.sel.nodes : this.sel.edges) as Set<GNode | GEdge>;
-    const soleSelection = set.has(item) && this.sel.nodes.size + this.sel.edges.size === 1;
-    if (additive) {
-      if (set.has(item)) set.delete(item);
-      else set.add(item);
-    } else {
-      this.sel.nodes.clear();
-      this.sel.edges.clear();
-      if (!soleSelection) set.add(item); // clicking the only selected item again deselects it
+    if (!enabled) {
+      this.pinned = { nodes: new Set(), edges: new Set() };
+      this.hovered = null;
     }
     this.apply();
   }
 
-  clear() {
-    this.sel = { nodes: new Set(), edges: new Set() };
+  /** Preview the highlight for whatever the pointer is over (`null` when it leaves). */
+  hover(item: GNode | GEdge | null) {
+    if (item === this.hovered) return;
+    this.hovered = item;
+    if (!this.active) this.apply();
+  }
+
+  /** Pin a node or edge; `additive` (shift-click) toggles it within the pinned set. */
+  select(item: GNode | GEdge, additive: boolean) {
+    const set = (item.kind === 'node' ? this.pinned.nodes : this.pinned.edges) as Set<GNode | GEdge>;
+    const soleSelection = set.has(item) && this.pinned.nodes.size + this.pinned.edges.size === 1;
+    if (additive) {
+      if (set.has(item)) set.delete(item);
+      else set.add(item);
+    } else {
+      this.pinned.nodes.clear();
+      this.pinned.edges.clear();
+      if (!soleSelection) set.add(item); // clicking the only pinned item again unpins it
+    }
     this.apply();
   }
 
+  /** Drop all pins (hover highlighting carries on). */
+  clear() {
+    this.pinned = { nodes: new Set(), edges: new Set() };
+    this.apply();
+  }
+
+  private current(): Selection {
+    if (!this.enabled) return { nodes: new Set(), edges: new Set() };
+    if (this.active) return this.pinned;
+    const h = this.hovered;
+    return {
+      nodes: new Set(h?.kind === 'node' ? [h] : []),
+      edges: new Set(h?.kind === 'edge' ? [h] : []),
+    };
+  }
+
   private apply() {
+    const sel = this.current();
     const next =
-      this.mode === 'off' || !this.active
+      sel.nodes.size + sel.edges.size === 0
         ? { nodes: new Set<GNode>(), edges: new Set<GEdge>() }
-        : expand(this.sel, this.mode, this.direction);
+        : expand(sel, this.mode, this.direction);
 
     for (const n of this.graph.nodes) {
       n.el.classList.toggle('ml-on', next.nodes.has(n));
-      n.el.classList.toggle('ml-sel', this.sel.nodes.has(n));
+      n.el.classList.toggle('ml-sel', sel.nodes.has(n));
     }
     for (const e of this.graph.edges) {
       const on = next.edges.has(e);
       if (on !== this.lit.edges.has(e)) this.swapMarkers(e.el, on);
       e.el.classList.toggle('ml-on', on);
-      e.el.classList.toggle('ml-sel', this.sel.edges.has(e));
+      e.el.classList.toggle('ml-sel', sel.edges.has(e));
       for (const l of e.labels) l.classList.toggle('ml-on', on);
     }
     this.lit = next;
