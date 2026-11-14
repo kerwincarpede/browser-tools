@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mermaid Lens</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="icons/icon-48.png" width="28" height="28" alt="" />
+      <div class="title">
+        <strong>Mermaid Lens</strong>
+        <span id="version"></span>
+      </div>
+    </header>
+
+    <section class="card site">
+      <button id="site-toggle" class="row toggle" role="switch" aria-checked="false">
+        <span class="label">
+          <span id="site-name">This site</span>
+          <span id="site-status" class="sub">Checking…</span>
+        </span>
+        <span class="switch"></span>
+      </button>
+      <button id="run-once" class="link" hidden>Just run on this page once</button>
+    </section>
+
+    <section class="card">
+      <h2>Highlight</h2>
+      <div class="seg" data-key="highlightMode">
+        <button data-val="off">Off</button>
+        <button data-val="neighbors">Connected</button>
+        <button data-val="flow">Full flow</button>
+      </div>
+      <div class="seg" data-key="direction">
+        <button data-val="both">Both ways</button>
+        <button data-val="down">Downstream</button>
+        <button data-val="up">Upstream</button>
+      </div>
+      <div class="swatches" id="swatches">
+        <label class="custom" title="Custom colour"><input id="custom-color" type="color" aria-label="Custom colour" /></label>
+      </div>
+    </section>
+
+    <section class="card">
+      <button id="flow-toggle" class="row toggle" role="switch" aria-checked="false">
+        <span class="label">Flowing edges<span class="sub">Animate arrows in their direction</span></span>
+        <span class="switch"></span>
+      </button>
+      <label class="row">
+        <span class="label">Diagram theme</span>
+        <select id="theme"></select>
+      </label>
+    </section>
+
+    <footer>
+      <span><kbd>F</kbd> full screen · <kbd>0</kbd> fit · <kbd>+</kbd><kbd>−</kbd> zoom · <kbd>Esc</kbd> clear</span>
+    </footer>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>
