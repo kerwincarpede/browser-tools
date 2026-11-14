@@ -37,6 +37,9 @@ cp extensions/mermaid-lens/tsconfig.json extensions/my-tool/
    files. Remove the Mermaid copy step if you don't need it.
 4. **Icons**: draw `assets/icon.svg`, then render 16/32/48/128 PNGs:
    `for s in 16 32 48 128; do rsvg-convert -w $s -h $s assets/icon.svg -o icons/icon-$s.png; done`
+   Detailed artwork turns to mush at 16/32px; if it does, draw simplified
+   `assets/icon-16.svg` / `assets/icon-32.svg` for those sizes (see Mermaid Lens's
+   `npm run icons`).
 5. Add `CHANGELOG.md` (`# Changelog`), `PRIVACY.md`, `store/listing.md` and a `README.md`.
 6. Add a row to the table in the root `README.md`.
 7. `npm install` at the root to register the workspace, then `npm run build -w my-tool`.
