@@ -215,6 +215,11 @@ pre { background:var(--card); padding:12px; border-radius:6px; overflow:auto; fo
 div.mermaid { white-space:pre; background:var(--card); padding:12px; border-radius:6px; font:12px/1.45 ui-monospace,Menlo,monospace; }
 details.src summary { cursor:pointer; color:var(--muted); font-size:12px; }
 html.hide-new [data-github="no"] { display:none; }
+.status { margin:16px 0; padding:12px 16px; border-radius:8px; border:1px solid var(--line); background:var(--card); }
+.status.good { border-color:var(--good); background:var(--good-bg); color:var(--good); }
+.status.bad { border-color:var(--bad); background:var(--bad-bg); color:var(--fg); }
+.status.bad strong { color:var(--bad); }
+.status ol { margin:6px 0 0; padding-left:20px; }
 label.toggle { color:var(--muted); font-size:13px; display:inline-flex; gap:6px; align-items:center; }
 #dynamic-slot:empty::before { content:"Nothing added yet."; color:var(--muted); }
 </style>
@@ -229,6 +234,7 @@ label.toggle { color:var(--muted); font-size:13px; display:inline-flex; gap:6px;
   </div>
 </div>
 <main>
+  <div class="status" id="lens-status" role="status">Waiting for Mermaid Lens…</div>
   <div class="intro">
     <p>Diagrams in the markup GitHub and other sites use, for checking Mermaid Lens by hand. The badges show what the 0.1.0 investigation found.</p>
     <ol>
@@ -284,6 +290,31 @@ label.toggle { color:var(--muted); font-size:13px; display:inline-flex; gap:6px;
     pre.append(code);
     document.getElementById('dynamic-slot').append(pre);
   });
+
+  // Tell the tester whether the extension picked the page up; without it the
+  // GitHub-style blocks only show their raw source.
+  const status = document.getElementById('lens-status');
+  const total = document.querySelectorAll('section[data-type="mermaid"]').length;
+  const report = (final) => {
+    const n = document.querySelectorAll('mermaid-lens-viewer').length;
+    if (n > 0) {
+      status.className = 'status good';
+      status.textContent = 'Mermaid Lens is running: ' + n + ' diagrams enhanced (' + total + ' GitHub-style blocks on the page).';
+    } else if (final) {
+      status.className = 'status bad';
+      status.innerHTML = '<strong>Mermaid Lens isn\u2019t running on this page</strong>, so the diagram blocks below only show their source.' +
+        '<ol><li>Check the extension is loaded and enabled at <code>edge://extensions</code> (or <code>chrome://extensions</code>).</li>' +
+        '<li>Click the Mermaid Lens icon (it may be under the puzzle-piece menu) and switch it on for <code>' + location.hostname + '</code>; allow access when asked.</li>' +
+        '<li>Reload this page.</li></ol>';
+    }
+  };
+  // Poll rather than observe: updating the banner is itself a DOM mutation.
+  let ticks = 0;
+  const poll = setInterval(() => {
+    ticks++;
+    report(ticks >= 5);
+    if (ticks >= 60) clearInterval(poll);
+  }, 1000);
 
   // The page renders these itself, like docs sites that bundle mermaid.js.
   if (!window.mermaid) return;
