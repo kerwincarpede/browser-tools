@@ -27,6 +27,8 @@ Then load `extensions/mermaid-lens/dist`:
 
 Open any README with a Mermaid diagram, e.g. https://github.com/mermaid-js/mermaid/blob/develop/README.md.
 
+To try every diagram type and the markup other sites use, run `npm run sample -w mermaid-lens` and open http://localhost:8787/. Turn the extension on for `localhost` from its toolbar popup, then reload. `npm run probe-types -w mermaid-lens` renders the same samples headlessly and prints a support table (screenshots go to `test/screenshots/types/`).
+
 While developing, `npm run dev -w mermaid-lens` rebuilds on save. Click the reload icon on the extension card, then refresh the GitHub tab.
 
 ## How it works
