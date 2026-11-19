@@ -3,12 +3,25 @@ import DOMPurify from 'dompurify';
 
 declare const mermaid: typeof import('mermaid').default;
 
+const zenuml = (globalThis as typeof globalThis & {
+  'mermaid-zenuml': typeof import('@mermaid-js/mermaid-zenuml').default;
+})['mermaid-zenuml'];
+const diagramsReady = mermaid.registerExternalDiagrams([zenuml], { lazyLoad: true });
+
 let chain: Promise<unknown> = Promise.resolve();
 let counter = 0;
 
 export interface Rendered {
   svg: string;
   diagramType: string;
+}
+
+function normalizeAgentflow(code: string): string {
+  // The 12.3.0 bundle still expects agentflow-beta. Keep any frontmatter
+  // and comments intact and translate only the diagram declaration.
+  const frontmatter = code.match(/^\s*---[ \t]*\r?\n(?:[^\r\n]*\r?\n)*?---[ \t]*\r?\n/)?.[0] ?? '';
+  const body = code.slice(frontmatter.length);
+  return frontmatter + body.replace(/^((?:[ \t]*(?:%%[^\r\n]*)?\r?\n)*[ \t]*)agentflow(?=\s|$)/, '$1agentflow-beta');
 }
 
 async function renderOnce(code: string, theme: string, securityLevel: 'sandbox' | 'strict'): Promise<Rendered> {
@@ -33,16 +46,18 @@ async function renderOnce(code: string, theme: string, securityLevel: 'sandbox' 
 
 export function renderMermaid(code: string, theme: string): Promise<Rendered> {
   const job = chain.then(async () => {
+    await diagramsReady;
+    const source = normalizeAgentflow(code);
     // 'sandbox' makes Mermaid lay out text inside a blank iframe, so the host
     // page's CSS (e.g. GitHub's `.label { font-size: 12px }`) can't skew label
     // measurements. We unwrap the SVG and sanitise it exactly as 'strict' would.
     // A few diagram types (gitGraph in Mermaid 12) can't render sandboxed, so
     // fall back to 'strict' for those.
     try {
-      const out = await renderOnce(code, theme, 'sandbox');
+      const out = await renderOnce(source, theme, 'sandbox');
       return { svg: unwrapSandbox(out.svg), diagramType: out.diagramType };
     } catch {
-      return renderOnce(code, theme, 'strict');
+      return renderOnce(source, theme, 'strict');
     }
   });
   chain = job.catch(() => {});

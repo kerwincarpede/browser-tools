@@ -11,18 +11,18 @@
 export interface GNode {
   kind: 'node';
   id: string;
-  el: SVGGElement;
+  el: SVGGraphicsElement;
+  /** Other rendered elements representing this item, such as a mirrored participant. */
+  parts?: SVGElement[];
   /** True for subgraphs / composite states. */
   cluster: boolean;
-  box: Box;
   out: GEdge[];
   in: GEdge[];
 }
 
 export interface GEdge {
   kind: 'edge';
-  el: SVGPathElement;
-  hit?: SVGPathElement;
+  el: SVGGeometryElement;
   labels: Element[];
   from?: GNode;
   to?: GNode;
@@ -33,6 +33,7 @@ export interface Graph {
   edges: GEdge[];
   /** Maps any clickable element (node group, hit path, label) to its graph item. */
   byElement: Map<Element, GNode | GEdge>;
+  expand?: typeof expand;
 }
 
 interface Box {
@@ -65,7 +66,7 @@ function matrixToRoot(el: SVGGraphicsElement, svg: SVGSVGElement): DOMMatrix {
 }
 
 /** getPointAtLength returns an SVGPoint, which only accepts SVGMatrix; go via DOMPoint. */
-function pointAt(path: SVGPathElement, at: number, m: DOMMatrix): DOMPoint {
+function pointAt(path: SVGGeometryElement, at: number, m: DOMMatrix): DOMPoint {
   const p = path.getPointAtLength(at);
   return new DOMPoint(p.x, p.y).matrixTransform(m);
 }
@@ -122,7 +123,7 @@ export function extractGraph(svg: SVGSVGElement): Graph | null {
   if (nodeEls.length === 0) return null;
   const clusterEls = [...svg.querySelectorAll<SVGGElement>('g.cluster')];
 
-  const nodes: GNode[] = [];
+  const nodes: (GNode & { box: Box })[] = [];
   const byId = new Map<string, GNode>();
   const byElement = new Map<Element, GNode | GEdge>();
 
@@ -132,7 +133,7 @@ export function extractGraph(svg: SVGSVGElement): Graph | null {
   ]) {
     const box = rootBox(el, svg);
     if (!box) continue;
-    const node: GNode = { kind: 'node', id: semanticId(el, svgId), el, cluster, box, out: [], in: [] };
+    const node = { kind: 'node' as const, id: semanticId(el, svgId), el, cluster, box, out: [], in: [] };
     nodes.push(node);
     byId.set(node.id, node);
     byElement.set(el, node);
@@ -243,17 +244,15 @@ function attachLabels(svg: SVGSVGElement, edges: GEdge[], byElement: Map<Element
 }
 
 /** Thin edges are hard to click; give each one a wide invisible twin. */
-function addHitAreas(edges: GEdge[], byElement: Map<Element, GNode | GEdge>) {
+export function addHitAreas(edges: GEdge[], byElement: Map<Element, GNode | GEdge>) {
   for (const e of edges) {
-    const d = e.el.getAttribute('d');
-    if (!d) continue;
-    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    hit.setAttribute('d', d);
-    const t = e.el.getAttribute('transform');
-    if (t) hit.setAttribute('transform', t);
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', e.el.localName);
+    for (const name of ['d', 'x1', 'y1', 'x2', 'y2', 'transform']) {
+      const value = e.el.getAttribute(name);
+      if (value !== null) hit.setAttribute(name, value);
+    }
     hit.setAttribute('class', 'ml-hit');
     e.el.after(hit);
-    e.hit = hit;
     byElement.set(hit, e);
   }
 }

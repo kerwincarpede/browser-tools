@@ -2,11 +2,12 @@
 
 A Chrome / Edge extension that gives Mermaid diagrams on GitHub (and any site you opt into) a proper viewer.
 
-- **Hides GitHub's built-in diagram frame and controls** and redraws the diagram with the bundled Mermaid (v12).
+- **Replaces GitHub's diagram frame** with a viewer that renders every diagram type shipped in Mermaid 12.3, plus ZenUML. Both renderers ship with the extension.
 - **Hover toolbar** (top-right): highlight mode · flowing edges · replay build-up · copy/export · full screen · more. Zoom controls bottom-right. The diagram itself is drawn borderless, with solid, softened node outlines and no drop shadows.
 - **Pan & zoom**: drag to pan; <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll or trackpad pinch to zoom; plain scrolling still scrolls the page. In full screen, the scroll wheel zooms and trackpad scrolling pans.
 - **Highlight** (on by default): hover a node or arrow. *Connected* lights up direct neighbours; *Full flow* lights up everything upstream and/or downstream. Click to pin a highlight, <kbd>Shift</kbd>-click to pin more, <kbd>Esc</kbd> to unpin. The toolbar's highlight button (or <kbd>H</kbd>) cycles *Connected* → *Full flow* → *Off*; direction and colour live under ⋯ → *Highlight options*. Works for flowcharts, state, class and ER diagrams.
 - **Highlight colour**: 8 presets plus a custom picker, synced across diagrams and devices.
+- **Sequence highlighting**: hover a message or participant to see exchanges. Hover an `alt` badge to see the entire decision, or a condition label to isolate its branch. *Full flow* traces messages in order through the selected branch and its shared lead-in and continuation. In Highlight options, choose *Before*, *After*, or *Both*. Click to pin and <kbd>Shift</kbd>-click to compare multiple branches.
 - **Animate**: *Flowing edges* (marching dashes in the arrow direction; only on highlighted edges while something is highlighted) and *Replay build-up* (nodes appear level by level while edges draw themselves). Both have toolbar buttons; ⋯ → *Animation timing* sets the dash cycle (0.2–3 s) and the build-up length (1–10 s).
 - **Copy**: Mermaid code, PNG image, SVG markup; download PNG/SVG; open in Mermaid Live Editor.
 - **Per-site switch**: ⋯ menu → *Enabled on github.com*. Turn it back on from the extension icon's popup, which also enables other sites and sets defaults.
@@ -27,6 +28,12 @@ Then load `extensions/mermaid-lens/dist`:
 
 Open any README with a Mermaid diagram, e.g. https://github.com/mermaid-js/mermaid/blob/develop/README.md.
 
+Open the [GitHub sample gallery](test/sample/diagrams.md) to try the diagrams in Markdown. For the local gallery, run `npm run sample -w mermaid-lens` and open http://localhost:8787/. Turn the extension on for `localhost` from its toolbar popup, then reload.
+
+On opted-in sites, Mermaid Lens also detects source blocks in common markup from Jekyll/Rouge, VitePress/Shiki, Astro Starlight/Expressive Code, and Hugo/Chroma. It can adopt Mermaid SVGs exposed in the page DOM. Diagrams that exist only inside a closed shadow root are inaccessible to the viewer.
+
+`npm run probe-types -w mermaid-lens` prints a support table and saves screenshots to `test/screenshots/types/`.
+
 While developing, `npm run dev -w mermaid-lens` rebuilds on save. Click the reload icon on the extension card, then refresh the GitHub tab.
 
 ## How it works
@@ -34,7 +41,7 @@ While developing, `npm run dev -w mermaid-lens` rebuilds on save. Click the relo
 | File | Role |
 | --- | --- |
 | `src/detector.ts` | ~2 KB content script on GitHub. Watches for Mermaid blocks and asks the service worker to inject the heavy parts only when one appears. |
-| `src/background.ts` | Injects `vendor/mermaid.min.js` + `enhancer.js`, keeps the toolbar badge (diagram count / "off") and registers content scripts for sites you opt into. |
+| `src/background.ts` | Injects the bundled Mermaid and ZenUML renderers and the enhancer, keeps the toolbar badge (diagram count / "off") and registers content scripts for sites you opt into. |
 | `src/enhancer/` | Finds diagrams (`sources.ts`), renders them (`renderer.ts`), and mounts a shadow-DOM viewer per diagram (`viewer.ts`) with pan/zoom, toolbar, highlight (`graph.ts`, `highlight.ts`), animation (`animate.ts`) and export (`export.ts`). |
 | `src/popup/` | Per-site switch and default settings. |
 

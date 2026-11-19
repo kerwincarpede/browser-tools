@@ -3,6 +3,7 @@
  * (`anchor`) and either the Mermaid source to render or an SVG the page
  * already rendered.
  */
+import { MERMAID_SOURCE_SELECTOR, MERMAID_SVG_SELECTOR } from '../shared/settings';
 
 export interface DiagramSource {
   anchor: HTMLElement | SVGSVGElement;
@@ -32,6 +33,15 @@ function githubSource(section: HTMLElement): string | undefined {
   return section.querySelector('pre')?.textContent ?? undefined;
 }
 
+function codeText(el: HTMLElement): string {
+  const code = el.querySelector('code') ?? el;
+  // Some syntax highlighters put every line in a separate element without
+  // adding line breaks. Indentation and line breaks are significant to Mermaid.
+  const lines = [...code.querySelectorAll(':scope > .line, :scope > .ec-line > .code')];
+  if (!lines.length) return code.textContent ?? '';
+  return lines.map((line) => line.textContent?.replace(/\r?\n$/, '') ?? '').join('\n');
+}
+
 export function findDiagrams(managed: Set<Element>): DiagramSource[] {
   const found: DiagramSource[] = [];
   const claim = (s: DiagramSource) => {
@@ -43,21 +53,22 @@ export function findDiagrams(managed: Set<Element>): DiagramSource[] {
 
   // GitHub (markdown files, READMEs, issues, PRs, discussions, wikis, gists).
   for (const section of document.querySelectorAll<HTMLElement>('section[data-type="mermaid"]')) {
-    claim({ anchor: section, code: githubSource(section) });
+    const code = githubSource(section);
+    if (code !== undefined) claim({ anchor: section, code });
   }
 
   // Unrendered fenced code blocks (GitLab, Gitea, Bitbucket, many static sites).
-  for (const el of document.querySelectorAll<HTMLElement>('pre[lang="mermaid"], code.language-mermaid, pre.mermaid')) {
+  for (const el of document.querySelectorAll<HTMLElement>(MERMAID_SOURCE_SELECTOR)) {
     if (el.closest('section[data-type="mermaid"]') || el.querySelector('svg')) continue;
-    if (el.closest('[contenteditable="true"], textarea')) continue;
-    const anchor = (el.localName === 'code' ? el.closest('pre') : el) ?? el;
-    claim({ anchor, code: el.textContent ?? '' });
+    if (el.isContentEditable || el.closest('textarea')) continue;
+    const pre = el.closest('pre');
+    const anchor = pre?.closest<HTMLElement>('div.language-mermaid') ?? pre ?? el;
+    claim({ anchor, code: codeText(el) });
   }
 
   // Diagrams the page rendered itself (docs sites using mermaid.js directly).
-  for (const svg of document.querySelectorAll<SVGSVGElement>('svg[aria-roledescription]')) {
-    const mermaidish = /mermaid/i.test(svg.id) || svg.closest('.mermaid, [class*="mermaid"]');
-    if (!mermaidish || !svg.isConnected) continue;
+  for (const svg of document.querySelectorAll<SVGSVGElement>(MERMAID_SVG_SELECTOR)) {
+    if (svg.closest('section[data-type="mermaid"]')) continue;
     claim({ anchor: svg, svg });
   }
 

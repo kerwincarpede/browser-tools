@@ -8,7 +8,9 @@ import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { samples } from './fixtures/all-types.mjs';
 import { githubPage } from './fixtures/diagrams.mjs';
+import { samplePage } from './sample/page.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const dist = path.join(root, 'dist');
@@ -32,6 +34,12 @@ await context.route('https://github.com/mermaid-lens-test/**', (route) => {
   const mode = new URL(route.request().url()).searchParams.get('mode') ?? 'light';
   route.fulfill({ contentType: 'text/html', body: githubPage(mode) });
 });
+await context.route('https://github.com/mermaid-lens-test/gallery', (route) =>
+  route.fulfill({ contentType: 'text/html', body: samplePage() }),
+);
+await context.route('https://github.com/vendor/mermaid.min.js', (route) =>
+  route.fulfill({ contentType: 'text/javascript', path: path.join(dist, 'vendor/mermaid.min.js') }),
+);
 
 const page = await context.newPage();
 const errors = [];
@@ -416,6 +424,81 @@ await step('popup renders', async () => {
   await popup.waitForTimeout(300);
   await popup.screenshot({ path: path.join(shots, 'popup.png') });
   await popup.close();
+});
+
+await step('renders every gallery example as a nonempty SVG', async () => {
+  await page.goto('https://github.com/mermaid-lens-test/gallery');
+  await Promise.all(samples.map(async ({ key }) => {
+    const svg = page.locator(`#type-${key} mermaid-lens-viewer .ml-svg`);
+    await svg.waitFor({ timeout: 20000 });
+    const { width, height } = await svg.evaluate((el) => {
+      const box = el.getBBox();
+      return { width: box.width, height: box.height };
+    });
+    assert.ok(width > 0 && height > 0, `${key} has visible content`);
+  }));
+  assert.equal(await page.locator('#type-zenuml .ml-svg').getAttribute('aria-roledescription'), 'zenuml');
+  assert.match(await page.locator('#type-zenuml .ml-svg').textContent(), /Alice/);
+});
+
+await step('finds source blocks and pre-rendered diagrams in documentation-site markup', async () => {
+  const keys = ['pre-mermaid', 'div-mermaid', 'code-language', 'pre-lang', 'rouge', 'shiki', 'expressive-code', 'chroma', 'page-rendered'];
+  await Promise.all(keys.map(async (key) => {
+    const viewer = page.locator(`#site-${key} mermaid-lens-viewer`);
+    await viewer.waitFor({ timeout: 10000 });
+    assert.equal(await viewer.count(), 1, key);
+    assert.match(await viewer.locator('.ml-svg').textContent(), /Write docs|GET \/docs/, key);
+  }));
+  assert.equal(await page.locator('#site-closed-shadow mermaid-lens-viewer').count(), 0);
+  await page.locator('#add-diagram').click();
+  const svg = page.locator('#dynamic-slot mermaid-lens-viewer .ml-svg');
+  await svg.waitFor({ timeout: 10000 });
+  assert.match(await svg.textContent(), /Added #1/);
+});
+
+await step('sequence highlighting selects an exchange, a decision, or one nested alternative', async () => {
+  const sequence = page.locator('#type-sequence mermaid-lens-viewer');
+  const message = (label) => sequence.locator('.messageText').getByText(label, { exact: true });
+  const guard = (label) => sequence.getByText(`[${label}]`, { exact: true });
+  const lit = () => sequence.locator('.messageText.ml-on').allTextContents();
+  await setStorage({ highlight: true, highlightMode: 'neighbors', direction: 'both' });
+  await sequence.locator('[data-act="cycle-highlight"][data-state="neighbors"]').waitFor();
+
+  const guardWeights = () => sequence.locator('text.ml-sequence-guard').evaluateAll((labels) =>
+    labels.map((label) => getComputedStyle(label).fontWeight),
+  );
+  const originalWeights = await guardWeights();
+  assert.ok(originalWeights.length > 0);
+  await guard('cache hit').hover();
+  assert.deepEqual(await lit(), ['Render cached']);
+  assert.deepEqual(await guardWeights(), originalWeights);
+
+  await message('GET /items').hover();
+  assert.deepEqual(await lit(), ['GET /items']);
+  assert.equal(await sequence.locator('.ml-edge.ml-on').count(), 1);
+  assert.deepEqual(await sequence.locator('line.actor-line.ml-on').evaluateAll((lines) => lines.map((line) => line.getAttribute('name'))), ['A', 'W']);
+
+  const outerDecision = sequence.locator('g[data-et="control-structure"]').filter({ hasText: /cache hit/ });
+  await outerDecision.locator('.labelText').click();
+  assert.deepEqual(await lit(), ['Render cached', 'Refresh items', 'Updated items', 'Load items', 'Fresh items', 'Render fresh']);
+  await guard('cache hit').click();
+  assert.deepEqual(await lit(), ['Render cached']);
+  await guard('no entry').click({ modifiers: ['Shift'] });
+  assert.deepEqual(await lit(), ['Render cached', 'Load items', 'Fresh items']);
+  await sequence.locator('.frame').press('Escape');
+
+  await setStorage({ highlightMode: 'flow', direction: 'both' });
+  await sequence.locator('[data-act="cycle-highlight"][data-state="flow"]').waitFor();
+  await guard('no entry').click();
+  assert.deepEqual(await lit(), ['Open page', 'GET /items', '200 OK', 'Load items', 'Fresh items', 'Render fresh', 'Confirm page']);
+  assert.deepEqual(await guardWeights(), originalWeights);
+  await sequence.screenshot({ path: path.join(shots, 'sequence-highlight.png') });
+  await setStorage({ direction: 'down' });
+  await sequence.locator('[data-act="set-direction"][data-val="down"][aria-checked="true"]').waitFor({ state: 'attached' });
+  assert.deepEqual(await lit(), ['Load items', 'Fresh items', 'Render fresh', 'Confirm page']);
+  await sequence.locator('.frame').press('Escape');
+  await page.mouse.move(5, 5);
+  await sequence.locator('svg.ml-has-hl').waitFor({ state: 'detached' });
 });
 
 if (process.argv.includes('--live')) {

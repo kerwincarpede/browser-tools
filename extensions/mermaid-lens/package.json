@@ -1,6 +1,6 @@
 {
   "name": "mermaid-lens",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser extension: pan, zoom, full-screen, highlight, animate and copy Mermaid diagrams.",
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -9,10 +9,14 @@
     "test": "npm run build && node test/e2e.mjs",
     "package": "npm run typecheck && npm run build && node scripts/package.mjs",
     "icons": "rsvg-convert -w 16 -h 16 assets/icon-16.svg -o icons/icon-16.png && rsvg-convert -w 32 -h 32 assets/icon-32.svg -o icons/icon-32.png && for s in 48 128; do rsvg-convert -w $s -h $s assets/icon.svg -o icons/icon-$s.png; done",
-    "store-assets": "npm run build && node scripts/store-assets.mjs"
+    "store-assets": "npm run build && node scripts/store-assets.mjs",
+    "sample": "node test/sample/serve.mjs",
+    "probe-types": "npm run build && node test/probe-types.mjs",
+    "sample:md": "node test/sample/markdown.mjs"
   },
   "license": "MIT",
   "devDependencies": {
+    "@mermaid-js/mermaid-zenuml": "1.0.1",
     "@types/chrome": "^0.3.7",
     "dompurify": "3.4.17",
     "esbuild": "^0.28.2",
