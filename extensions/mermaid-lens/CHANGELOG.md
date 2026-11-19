@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 — 2026-11-19
+
+- fix(mermaid-lens): expand diagrams within the browser tab (#5)
+- chore(mermaid-lens): refresh Chrome Web Store screenshots (#6)
+
 ## 0.2.0 — 2026-11-19
 
 - Bundle ZenUML and verify the viewer against every diagram type in Mermaid 12.3, including swimlanes, UML use cases, Agentflow, event modeling, and railroad diagrams.

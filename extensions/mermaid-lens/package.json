@@ -1,6 +1,6 @@
 {
   "name": "mermaid-lens",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Browser extension: pan, zoom, expand, highlight, animate and copy Mermaid diagrams.",
   "scripts": {
     "build": "node scripts/build.mjs",
