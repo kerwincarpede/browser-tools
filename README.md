@@ -4,7 +4,7 @@ My Chrome & Microsoft Edge extensions, one folder per extension under `extension
 
 | Extension | What it does |
 | --- | --- |
-| [Mermaid Lens](extensions/mermaid-lens) | Pan, zoom, full-screen, highlight, animate and copy Mermaid diagrams on GitHub (and any site you opt into). |
+| [Mermaid Lens](extensions/mermaid-lens) | Pan, zoom, expand, highlight, animate and copy Mermaid diagrams on GitHub (and any site you opt into). |
 
 ## Quick start
 

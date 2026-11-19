@@ -3,8 +3,8 @@
 A Chrome / Edge extension that gives Mermaid diagrams on GitHub (and any site you opt into) a proper viewer.
 
 - **Replaces GitHub's diagram frame** with a viewer that renders every diagram type shipped in Mermaid 12.3, plus ZenUML. Both renderers ship with the extension.
-- **Hover toolbar** (top-right): highlight mode · flowing edges · replay build-up · copy/export · full screen · more. Zoom controls bottom-right. The diagram itself is drawn borderless, with solid, softened node outlines and no drop shadows.
-- **Pan & zoom**: drag to pan; <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll or trackpad pinch to zoom; plain scrolling still scrolls the page. In full screen, the scroll wheel zooms and trackpad scrolling pans.
+- **Hover toolbar** (top-right): highlight mode · flowing edges · replay build-up · copy/export · expand in tab · more. Zoom controls bottom-right. The diagram itself is drawn borderless, with solid, softened node outlines and no drop shadows.
+- **Pan & zoom**: drag to pan; <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + scroll or trackpad pinch to zoom; plain scrolling still scrolls the page. In the expanded viewer, the scroll wheel zooms and trackpad scrolling pans. **Expand in tab** fills the browser tab and leaves other displays available.
 - **Highlight** (on by default): hover a node or arrow. *Connected* lights up direct neighbours; *Full flow* lights up everything upstream and/or downstream. Click to pin a highlight, <kbd>Shift</kbd>-click to pin more, <kbd>Esc</kbd> to unpin. The toolbar's highlight button (or <kbd>H</kbd>) cycles *Connected* → *Full flow* → *Off*; direction and colour live under ⋯ → *Highlight options*. Works for flowcharts, state, class and ER diagrams.
 - **Highlight colour**: 8 presets plus a custom picker, synced across diagrams and devices.
 - **Sequence highlighting**: hover a message or participant to see exchanges. Hover an `alt` badge to see the entire decision, or a condition label to isolate its branch. *Full flow* traces messages in order through the selected branch and its shared lead-in and continuation. In Highlight options, choose *Before*, *After*, or *Both*. Click to pin and <kbd>Shift</kbd>-click to compare multiple branches.
@@ -12,7 +12,7 @@ A Chrome / Edge extension that gives Mermaid diagrams on GitHub (and any site yo
 - **Copy**: Mermaid code, PNG image, SVG markup; download PNG/SVG; open in Mermaid Live Editor.
 - **Per-site switch**: ⋯ menu → *Enabled on github.com*. Turn it back on from the extension icon's popup, which also enables other sites and sets defaults.
 
-Keyboard (diagram focused): <kbd>F</kbd> full screen · <kbd>H</kbd> cycle highlight mode · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>−</kbd> zoom · arrows pan · <kbd>Esc</kbd> unpin.
+Keyboard (diagram focused): <kbd>F</kbd> toggle expanded view · <kbd>H</kbd> cycle highlight mode · <kbd>0</kbd> fit · <kbd>+</kbd>/<kbd>−</kbd> zoom · arrows pan · <kbd>Esc</kbd> unpin or exit the expanded view.
 
 ## Try it locally
 
@@ -59,7 +59,7 @@ npm test -w mermaid-lens          # fixture page served at https://github.com/..
 node test/e2e.mjs --live          # also checks a real GitHub README
 ```
 
-The e2e suite loads the built extension into Chromium and checks rendering, label sizing, highlighting (neighbours, full flow, direction, edges, state/class diagrams), colour sync, zoom/pan, wheel passthrough, clipboard (code + PNG), SVG download, full screen, animations, the per-site switch and dark mode.
+The e2e suite loads the built extension into Chromium and checks rendering, label sizing, highlighting (neighbours, full flow, direction, edges, state/class diagrams), colour sync, zoom/pan, wheel passthrough, clipboard (code + PNG), SVG download, in-tab expansion, animations, the per-site switch and dark mode.
 
 ## Releasing
 

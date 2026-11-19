@@ -319,14 +319,31 @@ await step('download SVG produces a standalone file', async () => {
   assert.doesNotMatch(svg, /drop-shadow/);
 });
 
-await step('full screen toggles and refits', async () => {
+await step('expanded view fills the tab and exits without native fullscreen', async () => {
+  const button = flow.getByRole('button', { name: 'Expand in tab' });
   await flow.hover();
-  await flow.locator('[data-act="fullscreen"]').click();
-  await page.waitForFunction(() => document.fullscreenElement?.localName === 'mermaid-lens-viewer');
-  await page.waitForTimeout(400);
+  const inline = await flow.locator('.frame').boundingBox();
+  await button.click();
+
+  const dialog = flow.locator('dialog:modal');
+  await dialog.waitFor();
+  assert.equal(await page.evaluate(() => document.fullscreenElement), null);
+  const { width, height } = page.viewportSize();
+  assert.deepEqual(await dialog.boundingBox(), { x: 0, y: 0, width, height });
+  assert.equal((await flow.boundingBox()).height, inline.height);
+  assert.ok(await flow.getByRole('button', { name: 'Return to page' }).isVisible());
   await page.screenshot({ path: path.join(shots, 'fullscreen.png') });
+
   await page.keyboard.press('f');
-  await page.waitForFunction(() => !document.fullscreenElement);
+  await dialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(await flow.locator('.frame').boundingBox(), inline);
+  assert.ok(await button.evaluate((el) => el.getRootNode().activeElement === el));
+
+  await flow.locator('.frame').press('Escape'); // clear any previous highlight pins
+  await flow.locator('.frame').press('f');
+  await dialog.waitFor();
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
 });
 
 await step('flowing edges and build-up replay', async () => {

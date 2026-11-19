@@ -42,9 +42,23 @@ export const BASE_CSS = /* css */ `
   --ml-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
   --ml-shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.5);
 }
-:host(:fullscreen) { background: var(--ml-page-bg); }
 
 * { box-sizing: border-box; }
+
+.expanded-view {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: var(--ml-page-bg);
+  color: inherit;
+}
 
 .frame {
   position: relative;
@@ -55,7 +69,7 @@ export const BASE_CSS = /* css */ `
 }
 /* No border: the diagram sits directly on the page. Keyboard focus still gets a ring. */
 .frame:focus-visible:not([data-pointer]) { outline: 2px solid var(--ml-accent); outline-offset: 2px; }
-:host(:fullscreen) .frame { height: 100% !important; border-radius: 0; outline: none; }
+.expanded-view .frame { height: 100% !important; border-radius: 0; outline: none; }
 
 .viewport {
   position: absolute;
@@ -79,7 +93,7 @@ export const BASE_CSS = /* css */ `
 
 /* ---------- floating UI ---------- */
 .ui { opacity: 0; transform: translateY(-2px); transition: opacity 0.16s ease, transform 0.16s ease; pointer-events: none; }
-.frame:hover .ui, .frame:focus-within .ui, .frame.engaged .ui, :host(:fullscreen) .ui {
+.frame:hover .ui, .frame:focus-within .ui, .frame.engaged .ui, .expanded-view .ui {
   opacity: 1; transform: none; pointer-events: auto;
 }
 .bar {

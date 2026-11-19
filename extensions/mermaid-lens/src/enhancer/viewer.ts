@@ -80,6 +80,8 @@ export class DiagramViewer {
   private root = this.host.attachShadow({ mode: 'open' });
   private diagramSheet = new CSSStyleSheet();
   private frame!: HTMLDivElement;
+  private expandedView!: HTMLDialogElement;
+  private expandButton!: HTMLButtonElement;
   private viewport!: HTMLDivElement;
   private zoomLabel!: HTMLElement;
   private hint!: HTMLElement;
@@ -93,7 +95,6 @@ export class DiagramViewer {
   private size = { w: 0, h: 0 };
   private lastWidth = 0;
   private pristine = true;
-  private fullscreen = false;
   private renderedTheme = '';
   private dark = false;
 
@@ -111,7 +112,6 @@ export class DiagramViewer {
   private hintShownAt = 0;
   private ro?: ResizeObserver;
   private prevDisplay: [string, string] = ['', ''];
-  private cleanups: (() => void)[] = [];
 
   constructor(
     readonly source: DiagramSource,
@@ -152,9 +152,7 @@ export class DiagramViewer {
   destroy() {
     this.ro?.disconnect();
     this.build?.stop();
-    this.cleanups.forEach((c) => c());
-    this.cleanups = [];
-    if (document.fullscreenElement === this.host) void document.exitFullscreen().catch(() => {});
+    this.expandedView?.close();
     this.host.remove();
     const [value, priority] = this.prevDisplay;
     if (this.mounted) {
@@ -231,7 +229,7 @@ export class DiagramViewer {
           <button class="btn" data-act="replay" data-tip="Replay build-up">${icon('replay')}</button>
           <button class="btn" data-act="pop-copy" data-tip="Copy &amp; export" aria-expanded="false">${icon('copy')}</button>
           <span class="sep"></span>
-          <button class="btn" data-act="fullscreen" data-tip="Full screen (F)">${icon('expand')}</button>
+          <button class="btn" data-act="fullscreen" data-tip="Expand in tab (F)" aria-label="Expand in tab">${icon('expand')}</button>
           <button class="btn" data-act="pop-more" data-tip="More" aria-expanded="false">${icon('more')}</button>
         </div>
 
@@ -289,10 +287,13 @@ export class DiagramViewer {
         </div>
 
         <div class="toast" role="status" aria-live="polite"></div>
-      </div>`;
+      </div>
+      <dialog class="expanded-view" aria-label="Expanded Mermaid diagram"></dialog>`;
 
     const $ = <T extends Element>(sel: string) => this.root.querySelector(sel) as T;
     this.frame = $('.frame');
+    this.expandedView = $('.expanded-view');
+    this.expandButton = $('[data-act="fullscreen"]');
     this.viewport = $('.viewport');
     this.zoomLabel = $('.zoom-label');
     this.hint = $('.hint');
@@ -329,18 +330,10 @@ export class DiagramViewer {
       r.addEventListener('change', () => this.ctx.update(patch()));
     });
 
-    const onFs = () => {
-      const fs = document.fullscreenElement === this.host;
-      if (fs === this.fullscreen) return;
-      this.fullscreen = fs;
-      const btn = $<HTMLElement>('[data-act="fullscreen"]');
-      btn.innerHTML = icon(fs ? 'collapse' : 'expand');
-      btn.dataset.tip = fs ? 'Exit full screen (F)' : 'Full screen (F)';
-      this.pristine = true;
-      if (fs) this.frame.focus({ preventScroll: true });
-    };
-    document.addEventListener('fullscreenchange', onFs);
-    this.cleanups.push(() => document.removeEventListener('fullscreenchange', onFs));
+    this.expandedView.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      this.closeExpandedView();
+    });
   }
 
   private setSvg(markup: string) {
@@ -438,7 +431,7 @@ export class DiagramViewer {
   private onResize() {
     const w = this.viewport.clientWidth;
     if (!w) return;
-    if (!this.fullscreen && w !== this.lastWidth) {
+    if (!this.expandedView.open && w !== this.lastWidth) {
       this.lastWidth = w;
       const h = this.inlineHeight(w);
       if (Math.abs(h - this.frame.offsetHeight) > 1) {
@@ -470,7 +463,7 @@ export class DiagramViewer {
 
   private get fitScale(): number {
     const { w, h } = this.size;
-    return Math.min((w - PAD * 2) / this.natural.w, (h - PAD * 2) / this.natural.h, this.fullscreen ? 2.5 : 1);
+    return Math.min((w - PAD * 2) / this.natural.w, (h - PAD * 2) / this.natural.h, this.expandedView.open ? 2.5 : 1);
   }
 
   fit() {
@@ -615,7 +608,7 @@ export class DiagramViewer {
 
   private onWheel(e: WheelEvent) {
     const zoomGesture = e.ctrlKey || e.metaKey;
-    if (!zoomGesture && !this.fullscreen) {
+    if (!zoomGesture && !this.expandedView.open) {
       if (performance.now() - this.hintShownAt > 2500) this.flashHint(`Hold <kbd>${MOD}</kbd> and scroll to zoom`);
       return; // let the page scroll
     }
@@ -659,7 +652,7 @@ export class DiagramViewer {
         break;
       case 'f':
       case 'F':
-        void this.toggleFullscreen();
+        this.toggleExpandedView();
         break;
       case 'h':
       case 'H':
@@ -668,7 +661,8 @@ export class DiagramViewer {
       case 'Escape':
         if (this.openPop) this.closePop();
         else if (this.highlighter?.active) this.highlighter.clear();
-        else return; // let the browser exit full screen
+        else if (this.expandedView.open) this.closeExpandedView();
+        else return;
         break;
       case 'ArrowLeft':
         pan(60, 0);
@@ -795,7 +789,7 @@ export class DiagramViewer {
         this.fit();
         break;
       case 'fullscreen':
-        void this.toggleFullscreen();
+        this.toggleExpandedView();
         break;
       case 'copy-code':
         this.closePop();
@@ -871,13 +865,41 @@ export class DiagramViewer {
     return `mermaid-${type}`;
   }
 
-  async toggleFullscreen() {
-    try {
-      if (document.fullscreenElement === this.host) await document.exitFullscreen();
-      else await this.host.requestFullscreen({ navigationUI: 'hide' });
-    } catch {
-      this.toast('Full screen isn’t available here');
+  private toggleExpandedView() {
+    if (this.expandedView.open) {
+      this.closeExpandedView();
+      return;
     }
+    // Keep the diagram's inline space while its viewer is in the dialog.
+    this.host.style.minHeight = `${this.frame.offsetHeight}px`;
+    this.expandedView.append(this.frame);
+    try {
+      this.expandedView.showModal();
+    } catch {
+      this.closeExpandedView();
+      this.toast('Couldn’t expand the diagram');
+      return;
+    }
+    this.updateExpandedView();
+    this.frame.focus({ preventScroll: true });
+  }
+
+  private closeExpandedView() {
+    this.expandedView.close();
+    this.expandedView.before(this.frame);
+    this.host.style.removeProperty('min-height');
+    this.updateExpandedView();
+    this.expandButton.focus({ preventScroll: true });
+  }
+
+  private updateExpandedView() {
+    const open = this.expandedView.open;
+    const label = open ? 'Return to page' : 'Expand in tab';
+    this.expandButton.innerHTML = icon(open ? 'collapse' : 'expand');
+    this.expandButton.dataset.tip = `${label} (F)`;
+    this.expandButton.setAttribute('aria-label', label);
+    this.pristine = true;
+    this.onResize();
   }
 
   private showPop(name: PopName, btn: HTMLElement) {
