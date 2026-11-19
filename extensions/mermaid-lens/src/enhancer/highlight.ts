@@ -80,11 +80,15 @@ export class Highlighter {
     const next =
       sel.nodes.size + sel.edges.size === 0
         ? { nodes: new Set<GNode>(), edges: new Set<GEdge>() }
-        : expand(sel, this.mode, this.direction);
+        : (this.graph.expand ?? expand)(sel, this.mode, this.direction);
 
     for (const n of this.graph.nodes) {
       n.el.classList.toggle('ml-on', next.nodes.has(n));
       n.el.classList.toggle('ml-sel', sel.nodes.has(n));
+      for (const el of n.parts ?? []) {
+        el.classList.toggle('ml-on', next.nodes.has(n));
+        el.classList.toggle('ml-sel', sel.nodes.has(n));
+      }
     }
     for (const e of this.graph.edges) {
       const on = next.edges.has(e);
@@ -98,7 +102,7 @@ export class Highlighter {
   }
 
   /** Arrowheads are shared <marker>s; point lit edges at recoloured copies. */
-  private swapMarkers(path: SVGPathElement, on: boolean) {
+  private swapMarkers(path: SVGGeometryElement, on: boolean) {
     for (const attr of ['marker-start', 'marker-end', 'marker-mid']) {
       if (on) {
         const v = path.getAttribute(attr);
@@ -117,7 +121,7 @@ export class Highlighter {
     }
   }
 
-  private markerClone(id: string, path: SVGPathElement): string | null {
+  private markerClone(id: string, path: SVGGeometryElement): string | null {
     const cached = this.markerClones.get(id);
     if (cached) return cached;
     const marker = [...this.svg.querySelectorAll('marker')].find((m) => m.id === id);

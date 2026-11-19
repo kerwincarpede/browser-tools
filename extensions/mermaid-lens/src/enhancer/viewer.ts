@@ -5,6 +5,7 @@ import { extractGraph, type GEdge, type GNode, type Graph } from './graph';
 import { Highlighter } from './highlight';
 import { icon } from './icons';
 import { isDarkBehind, pageBackground, renderMermaid } from './renderer';
+import { extractSequence } from './sequence';
 import { HOST_TAG, type DiagramSource } from './sources';
 import { BASE_CSS } from './styles';
 
@@ -205,6 +206,7 @@ export class DiagramViewer {
   private buildUi() {
     const site = esc(this.ctx.siteName);
     const canCode = this.source.code !== undefined;
+    const sequence = this.diagramType === 'sequence';
     const item = (act: string, ic: Parameters<typeof icon>[0], label: string, sub = '', extra = '') =>
       `<button class="item" data-act="${act}" ${extra}>${icon(ic)}<span class="label">${label}${sub ? `<span class="sub">${sub}</span>` : ''}</span></button>`;
     const slider = (key: TimingKey, label: string, lo: string, hi: string) => {
@@ -248,7 +250,7 @@ export class DiagramViewer {
           ${seg('highlightMode', [['neighbors', 'Connected'], ['flow', 'Full flow']])}
           <div class="row">
             <h4>Direction</h4>
-            ${seg('direction', [['both', 'Both'], ['down', 'Downstream'], ['up', 'Upstream']])}
+            ${seg('direction', sequence ? [['both', 'Both'], ['down', 'After'], ['up', 'Before']] : [['both', 'Both'], ['down', 'Downstream'], ['up', 'Upstream']])}
           </div>
           <div class="row">
             <h4>Colour</h4>
@@ -257,7 +259,9 @@ export class DiagramViewer {
               <label class="custom" data-tip="Custom colour"><input type="color" aria-label="Custom colour"></label>
             </div>
           </div>
-          <p class="note">Hover a node or arrow to light up what it connects to. Click to pin it, <kbd>Shift</kbd>-click to pin more, <kbd>Esc</kbd> or click empty space to unpin.</p>
+          <p class="note">${sequence
+            ? 'Hover a message, participant or alt condition. Full flow follows message order through compatible branches.'
+            : 'Hover a node or arrow to light up what it connects to.'} Click to pin it, <kbd>Shift</kbd>-click to pin more, <kbd>Esc</kbd> or click empty space to unpin.</p>
         </div>
 
         <div class="pop" data-pop="timing" role="dialog" aria-label="Animation timing">
@@ -310,7 +314,7 @@ export class DiagramViewer {
     this.viewport.addEventListener('pointerleave', () => this.setHover(null));
     this.viewport.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
     this.viewport.addEventListener('dblclick', (e) => {
-      if ((e.target as Element).closest('g.node, .ml-hit, g.edgeLabel')) return;
+      if ((e.target as Element).closest('g.node, .ml-hit, g.edgeLabel, .ml-sequence-target')) return;
       const p = this.local(e);
       this.zoomAt(e.shiftKey ? 0.5 : 2, p.x, p.y, true);
     });
@@ -690,7 +694,7 @@ export class DiagramViewer {
   private ensureGraph(): Graph | null {
     if (this.graph !== undefined || !this.svg) return this.graph ?? null;
     if (!this.viewport.clientWidth) return null; // not laid out yet (e.g. collapsed <details>)
-    this.graph = extractGraph(this.svg);
+    this.graph = this.diagramType === 'sequence' ? extractSequence(this.svg) : extractGraph(this.svg);
     if (this.graph) {
       const s = this.ctx.settings();
       this.highlighter = new Highlighter(this.svg, this.graph, s.highlight, s.highlightMode, s.direction);
@@ -736,7 +740,7 @@ export class DiagramViewer {
   }
 
   private hitTest(target: Element, graph: Graph): GNode | GEdge | null {
-    const el = target.closest('.ml-hit, g.node, g.edgeLabel, .cluster-label');
+    const el = target.closest('.ml-hit, g.node, g.edgeLabel, .cluster-label, .ml-sequence-target');
     if (!el) return null;
     if (el.matches('.cluster-label')) {
       const cluster = el.closest('g.cluster');
@@ -846,7 +850,7 @@ export class DiagramViewer {
     svg.classList.remove('ml-flowing'); // its !important dash styles would fight the draw-in
     const s = this.ctx.settings();
     this.build.play(
-      this.ensureGraph(),
+      this.diagramType === 'sequence' ? null : this.ensureGraph(),
       () => svg.classList.toggle('ml-flowing', this.ctx.settings().flowAnimation),
       s.buildDuration / BASE_BUILD_SECONDS,
     );

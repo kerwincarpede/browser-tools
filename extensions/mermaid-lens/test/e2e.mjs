@@ -456,6 +456,41 @@ await step('finds source blocks and pre-rendered diagrams in documentation-site 
   assert.match(await svg.textContent(), /Added #1/);
 });
 
+await step('sequence highlighting selects an exchange, a decision, or one nested alternative', async () => {
+  const sequence = page.locator('#type-sequence mermaid-lens-viewer');
+  const message = (label) => sequence.locator('.messageText').getByText(label, { exact: true });
+  const guard = (label) => sequence.getByText(`[${label}]`, { exact: true });
+  const lit = () => sequence.locator('.messageText.ml-on').allTextContents();
+  await setStorage({ highlight: true, highlightMode: 'neighbors', direction: 'both' });
+  await sequence.locator('[data-act="cycle-highlight"][data-state="neighbors"]').waitFor();
+
+  await message('GET /items').hover();
+  assert.deepEqual(await lit(), ['GET /items']);
+  assert.equal(await sequence.locator('.ml-edge.ml-on').count(), 1);
+  assert.deepEqual(await sequence.locator('line.actor-line.ml-on').evaluateAll((lines) => lines.map((line) => line.getAttribute('name'))), ['A', 'W']);
+
+  const outerDecision = sequence.locator('g[data-et="control-structure"]').filter({ hasText: /cache hit/ });
+  await outerDecision.locator('.labelText').click();
+  assert.deepEqual(await lit(), ['Render cached', 'Refresh items', 'Updated items', 'Load items', 'Fresh items', 'Render fresh']);
+  await guard('cache hit').click();
+  assert.deepEqual(await lit(), ['Render cached']);
+  await guard('no entry').click({ modifiers: ['Shift'] });
+  assert.deepEqual(await lit(), ['Render cached', 'Load items', 'Fresh items']);
+  await sequence.locator('.frame').press('Escape');
+
+  await setStorage({ highlightMode: 'flow', direction: 'both' });
+  await sequence.locator('[data-act="cycle-highlight"][data-state="flow"]').waitFor();
+  await guard('no entry').click();
+  assert.deepEqual(await lit(), ['Open page', 'GET /items', '200 OK', 'Load items', 'Fresh items', 'Render fresh', 'Confirm page']);
+  await sequence.screenshot({ path: path.join(shots, 'sequence-highlight.png') });
+  await setStorage({ direction: 'down' });
+  await sequence.locator('[data-act="set-direction"][data-val="down"][aria-checked="true"]').waitFor({ state: 'attached' });
+  assert.deepEqual(await lit(), ['Load items', 'Fresh items', 'Render fresh', 'Confirm page']);
+  await sequence.locator('.frame').press('Escape');
+  await page.mouse.move(5, 5);
+  await sequence.locator('svg.ml-has-hl').waitFor({ state: 'detached' });
+});
+
 if (process.argv.includes('--live')) {
   await step('real GitHub README (network)', async () => {
     await page.goto('https://github.com/mermaid-js/mermaid/blob/develop/README.md');

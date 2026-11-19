@@ -369,6 +369,17 @@ svg g.node.ml-sel, svg g.cluster.ml-sel {
 svg .ml-edge.ml-on { stroke: var(--ml-hl) !important; stroke-width: 2px !important; }
 svg .ml-edge.ml-sel { stroke-width: 2.5px !important; }
 
+/* ---------- sequence diagrams ---------- */
+svg.ml-hl-enabled .ml-sequence-target { cursor: pointer; }
+svg.ml-has-hl :is(.ml-sequence-guard, .ml-sequence-divider, .ml-sequence-participant):not(.ml-on) { opacity: 0.35; }
+svg :is(.ml-sequence-divider, line.ml-sequence-participant).ml-on,
+svg .ml-sequence-participant.ml-on :is(rect, circle, line, polygon, path) {
+  stroke: var(--ml-hl) !important;
+  stroke-opacity: 1;
+}
+svg .ml-sequence-divider.ml-on { stroke-width: 2px !important; }
+svg .ml-sequence-guard.ml-on { font-weight: 650 !important; }
+
 /* ---------- diagram: flowing edges ---------- */
 svg.ml-flowing:not(.ml-has-hl) .ml-edge,
 svg.ml-flowing.ml-has-hl .ml-edge.ml-on {

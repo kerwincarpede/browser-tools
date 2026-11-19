@@ -28,6 +28,7 @@ sequenceDiagram
   actor U as User
   participant W as Web
   participant A as API
+  participant L as Logger
   U->>W: Open page
   W->>A: GET /items
   activate A
@@ -36,9 +37,17 @@ sequenceDiagram
   alt cache hit
     W-->>U: Render cached
   else miss
+    alt stale entry
+      W->>A: Refresh items
+      A-->>W: Updated items
+    else no entry
+      W->>A: Load items
+      A-->>W: Fresh items
+    end
     W-->>U: Render fresh
   end
-  Note over W,A: All calls over HTTPS
+  U->>W: Confirm page
+  L->>L: Rotate logs
 ```
 
 ### Class diagram

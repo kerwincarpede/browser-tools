@@ -89,7 +89,7 @@ export class BuildAnimation {
 
   private playGeneric(): number {
     const root = this.svg.querySelector(':scope > g') ?? this.svg;
-    let items = [...this.svg.children].filter((c) => !/^(style|defs|title|desc)$/i.test(c.tagName));
+    let items = [...this.svg.children].filter((c) => !c.matches('style, defs, title, desc, .ml-hit'));
     if (items.length === 1 && root.children.length > 1) items = [...root.children];
     items = items.slice(0, 400);
     const step = Math.min(220, Math.max(12, 2600 / Math.max(1, items.length))) * this.scale;
@@ -99,7 +99,7 @@ export class BuildAnimation {
   }
 }
 
-function safeLength(p: SVGPathElement): number {
+function safeLength(p: SVGGeometryElement): number {
   try {
     return p.getTotalLength();
   } catch {
