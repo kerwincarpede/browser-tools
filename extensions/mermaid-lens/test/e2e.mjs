@@ -319,36 +319,31 @@ await step('download SVG produces a standalone file', async () => {
   assert.doesNotMatch(svg, /drop-shadow/);
 });
 
-await step('expanded view refits and exits without native fullscreen on macOS', async () => {
-  const mac = await page.evaluate(() => navigator.platform.startsWith('Mac'));
-  const button = flow.locator('[data-act="fullscreen"]');
+await step('expanded view fills the tab and exits without native fullscreen', async () => {
+  const button = flow.getByRole('button', { name: 'Expand in tab' });
   await flow.hover();
   const inline = await flow.locator('.frame').boundingBox();
   await button.click();
-  if (mac) {
-    const dialog = flow.locator('dialog:modal');
-    await dialog.waitFor();
-    assert.equal(await page.evaluate(() => document.fullscreenElement), null);
-    const { width, height } = page.viewportSize();
-    assert.deepEqual(await dialog.boundingBox(), { x: 0, y: 0, width, height });
-    assert.equal((await flow.boundingBox()).height, inline.height);
-    assert.equal(await button.getAttribute('aria-label'), 'Return to page');
-  } else {
-    await page.waitForFunction(() => document.fullscreenElement?.localName === 'mermaid-lens-viewer');
-  }
+
+  const dialog = flow.locator('dialog:modal');
+  await dialog.waitFor();
+  assert.equal(await page.evaluate(() => document.fullscreenElement), null);
+  const { width, height } = page.viewportSize();
+  assert.deepEqual(await dialog.boundingBox(), { x: 0, y: 0, width, height });
+  assert.equal((await flow.boundingBox()).height, inline.height);
+  assert.ok(await flow.getByRole('button', { name: 'Return to page' }).isVisible());
   await page.screenshot({ path: path.join(shots, 'fullscreen.png') });
+
   await page.keyboard.press('f');
-  if (mac) {
-    await flow.locator('dialog:modal').waitFor({ state: 'hidden' });
-    assert.deepEqual(await flow.locator('.frame').boundingBox(), inline);
-    await flow.locator('.frame').press('Escape'); // clear any previous highlight pins
-    await flow.locator('.frame').press('f');
-    await flow.locator('dialog:modal').waitFor();
-    await page.keyboard.press('Escape');
-    await flow.locator('dialog:modal').waitFor({ state: 'hidden' });
-  } else {
-    await page.waitForFunction(() => !document.fullscreenElement);
-  }
+  await dialog.waitFor({ state: 'hidden' });
+  assert.deepEqual(await flow.locator('.frame').boundingBox(), inline);
+  assert.ok(await button.evaluate((el) => el.getRootNode().activeElement === el));
+
+  await flow.locator('.frame').press('Escape'); // clear any previous highlight pins
+  await flow.locator('.frame').press('f');
+  await dialog.waitFor();
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
 });
 
 await step('flowing edges and build-up replay', async () => {

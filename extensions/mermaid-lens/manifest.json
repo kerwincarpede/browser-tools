@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Mermaid Lens",
   "version": "0.1.0",
-  "description": "Pan, zoom, full-screen, highlight, animate and copy Mermaid diagrams on GitHub and any site you choose.",
+  "description": "Pan, zoom, expand, highlight, animate and copy Mermaid diagrams on GitHub and any site you choose.",
   "minimum_chrome_version": "121",
   "icons": {
     "16": "icons/icon-16.png",

@@ -19,7 +19,6 @@ export interface ViewerContext {
 
 const PAD = 16;
 const MIN_HEIGHT = 140;
-const MAC = navigator.platform.startsWith('Mac');
 const MOD = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 const HINT = `Drag to pan · <kbd>${MOD}</kbd> + scroll to zoom · Hover to highlight, click to pin`;
 /** Grace period before un-highlighting, so crossing a gap between shapes doesn't flicker. */
@@ -82,7 +81,7 @@ export class DiagramViewer {
   private diagramSheet = new CSSStyleSheet();
   private frame!: HTMLDivElement;
   private expandedView!: HTMLDialogElement;
-  private fullscreenButton!: HTMLButtonElement;
+  private expandButton!: HTMLButtonElement;
   private viewport!: HTMLDivElement;
   private zoomLabel!: HTMLElement;
   private hint!: HTMLElement;
@@ -96,7 +95,6 @@ export class DiagramViewer {
   private size = { w: 0, h: 0 };
   private lastWidth = 0;
   private pristine = true;
-  private fullscreen = false;
   private renderedTheme = '';
   private dark = false;
 
@@ -114,7 +112,6 @@ export class DiagramViewer {
   private hintShownAt = 0;
   private ro?: ResizeObserver;
   private prevDisplay: [string, string] = ['', ''];
-  private cleanups: (() => void)[] = [];
 
   constructor(
     readonly source: DiagramSource,
@@ -155,10 +152,7 @@ export class DiagramViewer {
   destroy() {
     this.ro?.disconnect();
     this.build?.stop();
-    this.cleanups.forEach((c) => c());
-    this.cleanups = [];
     this.expandedView?.close();
-    if (document.fullscreenElement === this.host) void document.exitFullscreen().catch(() => {});
     this.host.remove();
     const [value, priority] = this.prevDisplay;
     if (this.mounted) {
@@ -211,7 +205,6 @@ export class DiagramViewer {
     const site = esc(this.ctx.siteName);
     const canCode = this.source.code !== undefined;
     const sequence = this.diagramType === 'sequence';
-    const fullscreenLabel = MAC ? 'Expand in tab' : 'Full screen';
     const item = (act: string, ic: Parameters<typeof icon>[0], label: string, sub = '', extra = '') =>
       `<button class="item" data-act="${act}" ${extra}>${icon(ic)}<span class="label">${label}${sub ? `<span class="sub">${sub}</span>` : ''}</span></button>`;
     const slider = (key: TimingKey, label: string, lo: string, hi: string) => {
@@ -236,7 +229,7 @@ export class DiagramViewer {
           <button class="btn" data-act="replay" data-tip="Replay build-up">${icon('replay')}</button>
           <button class="btn" data-act="pop-copy" data-tip="Copy &amp; export" aria-expanded="false">${icon('copy')}</button>
           <span class="sep"></span>
-          <button class="btn" data-act="fullscreen" data-tip="${fullscreenLabel} (F)" aria-label="${fullscreenLabel}">${icon('expand')}</button>
+          <button class="btn" data-act="fullscreen" data-tip="Expand in tab (F)" aria-label="Expand in tab">${icon('expand')}</button>
           <button class="btn" data-act="pop-more" data-tip="More" aria-expanded="false">${icon('more')}</button>
         </div>
 
@@ -300,7 +293,7 @@ export class DiagramViewer {
     const $ = <T extends Element>(sel: string) => this.root.querySelector(sel) as T;
     this.frame = $('.frame');
     this.expandedView = $('.expanded-view');
-    this.fullscreenButton = $('[data-act="fullscreen"]');
+    this.expandButton = $('[data-act="fullscreen"]');
     this.viewport = $('.viewport');
     this.zoomLabel = $('.zoom-label');
     this.hint = $('.hint');
@@ -337,16 +330,10 @@ export class DiagramViewer {
       r.addEventListener('change', () => this.ctx.update(patch()));
     });
 
-    if (MAC) {
-      this.expandedView.addEventListener('cancel', (e) => {
-        e.preventDefault();
-        this.closeExpandedView();
-      });
-    } else {
-      const onFs = () => this.setFullscreen(document.fullscreenElement === this.host);
-      document.addEventListener('fullscreenchange', onFs);
-      this.cleanups.push(() => document.removeEventListener('fullscreenchange', onFs));
-    }
+    this.expandedView.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      this.closeExpandedView();
+    });
   }
 
   private setSvg(markup: string) {
@@ -444,7 +431,7 @@ export class DiagramViewer {
   private onResize() {
     const w = this.viewport.clientWidth;
     if (!w) return;
-    if (!this.fullscreen && w !== this.lastWidth) {
+    if (!this.expandedView.open && w !== this.lastWidth) {
       this.lastWidth = w;
       const h = this.inlineHeight(w);
       if (Math.abs(h - this.frame.offsetHeight) > 1) {
@@ -476,7 +463,7 @@ export class DiagramViewer {
 
   private get fitScale(): number {
     const { w, h } = this.size;
-    return Math.min((w - PAD * 2) / this.natural.w, (h - PAD * 2) / this.natural.h, this.fullscreen ? 2.5 : 1);
+    return Math.min((w - PAD * 2) / this.natural.w, (h - PAD * 2) / this.natural.h, this.expandedView.open ? 2.5 : 1);
   }
 
   fit() {
@@ -621,7 +608,7 @@ export class DiagramViewer {
 
   private onWheel(e: WheelEvent) {
     const zoomGesture = e.ctrlKey || e.metaKey;
-    if (!zoomGesture && !this.fullscreen) {
+    if (!zoomGesture && !this.expandedView.open) {
       if (performance.now() - this.hintShownAt > 2500) this.flashHint(`Hold <kbd>${MOD}</kbd> and scroll to zoom`);
       return; // let the page scroll
     }
@@ -665,7 +652,7 @@ export class DiagramViewer {
         break;
       case 'f':
       case 'F':
-        void this.toggleFullscreen();
+        this.toggleExpandedView();
         break;
       case 'h':
       case 'H':
@@ -675,7 +662,7 @@ export class DiagramViewer {
         if (this.openPop) this.closePop();
         else if (this.highlighter?.active) this.highlighter.clear();
         else if (this.expandedView.open) this.closeExpandedView();
-        else return; // let the browser exit full screen
+        else return;
         break;
       case 'ArrowLeft':
         pan(60, 0);
@@ -802,7 +789,7 @@ export class DiagramViewer {
         this.fit();
         break;
       case 'fullscreen':
-        void this.toggleFullscreen();
+        this.toggleExpandedView();
         break;
       case 'copy-code':
         this.closePop();
@@ -878,52 +865,41 @@ export class DiagramViewer {
     return `mermaid-${type}`;
   }
 
-  async toggleFullscreen() {
-    if (MAC) {
-      if (this.expandedView.open) {
-        this.closeExpandedView();
-      } else {
-        // Keep the diagram's inline space while its viewer is in the dialog.
-        this.host.style.minHeight = `${this.frame.offsetHeight}px`;
-        this.expandedView.append(this.frame);
-        try {
-          this.expandedView.showModal();
-          this.setFullscreen(true);
-        } catch {
-          this.closeExpandedView();
-          this.toast('Couldn’t expand the diagram');
-        }
-      }
+  private toggleExpandedView() {
+    if (this.expandedView.open) {
+      this.closeExpandedView();
       return;
     }
+    // Keep the diagram's inline space while its viewer is in the dialog.
+    this.host.style.minHeight = `${this.frame.offsetHeight}px`;
+    this.expandedView.append(this.frame);
     try {
-      if (document.fullscreenElement === this.host) await document.exitFullscreen();
-      else await this.host.requestFullscreen({ navigationUI: 'hide' });
+      this.expandedView.showModal();
     } catch {
-      this.toast('Full screen isn’t available here');
+      this.closeExpandedView();
+      this.toast('Couldn’t expand the diagram');
+      return;
     }
+    this.updateExpandedView();
+    this.frame.focus({ preventScroll: true });
   }
 
   private closeExpandedView() {
     this.expandedView.close();
     this.expandedView.before(this.frame);
     this.host.style.removeProperty('min-height');
-    this.setFullscreen(false);
-    this.fullscreenButton.focus({ preventScroll: true });
+    this.updateExpandedView();
+    this.expandButton.focus({ preventScroll: true });
   }
 
-  private setFullscreen(open: boolean) {
-    if (open === this.fullscreen) return;
-    this.fullscreen = open;
-    const label = MAC
-      ? (open ? 'Return to page' : 'Expand in tab')
-      : (open ? 'Exit full screen' : 'Full screen');
-    this.fullscreenButton.innerHTML = icon(open ? 'collapse' : 'expand');
-    this.fullscreenButton.dataset.tip = `${label} (F)`;
-    this.fullscreenButton.setAttribute('aria-label', label);
+  private updateExpandedView() {
+    const open = this.expandedView.open;
+    const label = open ? 'Return to page' : 'Expand in tab';
+    this.expandButton.innerHTML = icon(open ? 'collapse' : 'expand');
+    this.expandButton.dataset.tip = `${label} (F)`;
+    this.expandButton.setAttribute('aria-label', label);
     this.pristine = true;
     this.onResize();
-    if (open) this.frame.focus({ preventScroll: true });
   }
 
   private showPop(name: PopName, btn: HTMLElement) {
