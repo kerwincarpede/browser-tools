@@ -92,16 +92,27 @@ export function isBuiltInHost(host: string): boolean {
 }
 
 /** Scripts injected (lazily) once a page is known to contain a diagram. */
-export const ENHANCER_FILES = ['vendor/mermaid.min.js', 'enhancer.js'];
+export const ENHANCER_FILES = ['vendor/mermaid.min.js', 'vendor/mermaid-zenuml.min.js', 'enhancer.js'];
+
+export const MERMAID_SOURCE_SELECTOR = [
+  'pre[lang="mermaid"]',
+  'pre[data-language="mermaid"]',
+  'pre.mermaid',
+  'code.language-mermaid',
+  'div.language-mermaid pre',
+  'div.mermaid:not([data-processed])',
+].join(',');
+
+export const MERMAID_SVG_SELECTOR = [
+  'svg[id*="mermaid" i][aria-roledescription]',
+  '[class*="mermaid" i] svg[aria-roledescription]',
+].join(',');
 
 /** Selector that cheaply tells us a page probably has a Mermaid diagram. */
 export const DIAGRAM_HINT_SELECTOR = [
   'section[data-type="mermaid"]',
-  'pre[lang="mermaid"]',
-  'code.language-mermaid',
-  'pre.mermaid',
-  'svg[id^="mermaid"][aria-roledescription]',
-  '.mermaid svg[aria-roledescription]',
+  MERMAID_SOURCE_SELECTOR,
+  MERMAID_SVG_SELECTOR,
 ].join(',');
 
 /** Messages exchanged between the content scripts, popup and service worker. */

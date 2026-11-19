@@ -367,8 +367,98 @@ Gas,Thermal generation,80`,
     detector.ts`,
   },
   {
+    key: 'swimlane',
+    title: 'Swimlanes',
+    code: `swimlane-beta LR
+  subgraph Design
+    Draft[Draft mockup]
+  end
+  subgraph Engineering
+    Build[Build screen]
+    Review[Review implementation]
+  end
+  Draft --> Build --> Review`,
+  },
+  {
+    key: 'usecase',
+    title: 'UML use case',
+    code: `usecase-beta
+  actor Reader
+  Browse("Browse catalogue")
+  Save("Save a title")
+  Reader --> Browse
+  Reader --> Save`,
+  },
+  {
+    key: 'eventmodeling',
+    title: 'Event modeling',
+    code: `eventmodeling
+  tf 01 ui LoanForm
+  tf 02 cmd BorrowBook
+  tf 03 evt BookBorrowed`,
+  },
+  {
+    key: 'cynefin',
+    title: 'Cynefin framework',
+    code: `cynefin-beta
+  title Improving search
+  clear
+    "Fix a broken link"
+  complicated
+    "Tune query performance"
+  complex
+    "Learn what readers search for"
+  chaotic
+    "Restore the search service"`,
+  },
+  {
+    key: 'agentflow',
+    title: 'Agentflow',
+    code: `---
+title: Book recommendations
+---
+%% A simple recommendation flow
+agentflow LR
+  A([Start]) --> B[Read the request]
+  B --> C[Suggest a title]
+  C --> D([Done])`,
+  },
+  {
+    key: 'railroad',
+    title: 'Railroad diagram',
+    code: `railroad-beta
+  greeting = sequence(terminal("hello"), choice(terminal("reader"), terminal("writer")));`,
+  },
+  {
+    key: 'railroad-ebnf',
+    title: 'Railroad diagram (EBNF)',
+    code: `railroad-ebnf-beta
+  integer = [ sign ], digit, { digit };
+  sign = "+" | "-";
+  digit = "0" | "1";`,
+  },
+  {
+    key: 'railroad-abnf',
+    title: 'Railroad diagram (ABNF)',
+    code: `railroad-abnf-beta
+  word = 1*letter;
+  letter = %x41-5A / %x61-7A;`,
+  },
+  {
+    key: 'railroad-peg',
+    title: 'Railroad diagram (PEG)',
+    code: `railroad-peg-beta
+  Answer <- "yes" / "no";`,
+  },
+  {
+    key: 'info',
+    title: 'Mermaid version',
+    github: true,
+    code: 'info',
+  },
+  {
     key: 'zenuml',
-    title: 'ZenUML (needs an external plugin)',
+    title: 'ZenUML',
     code: `zenuml
   Alice->Bob: Hello
   Bob->Alice: Hi`,

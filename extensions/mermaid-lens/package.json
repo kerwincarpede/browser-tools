@@ -1,6 +1,6 @@
 {
   "name": "mermaid-lens",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser extension: pan, zoom, full-screen, highlight, animate and copy Mermaid diagrams.",
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -16,6 +16,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@mermaid-js/mermaid-zenuml": "1.0.1",
     "@types/chrome": "^0.3.7",
     "dompurify": "3.4.17",
     "esbuild": "^0.28.2",

@@ -1,10 +1,10 @@
 # Mermaid Lens: every diagram type
 
-Open this file on github.com with Mermaid Lens installed. Each block below is a `mermaid` code fence, so GitHub renders it and Mermaid Lens should replace GitHub's frame with its own viewer (hover a diagram for the toolbar).
+Open this file on github.com with Mermaid Lens installed. Hover a diagram to open the viewer toolbar.
 
 Generated from `test/fixtures/all-types.mjs` by `npm run sample:md -w mermaid-lens`; edit the fixture, not this file.
 
-## Types GitHub supports
+## Common GitHub examples
 
 ### Flowchart
 
@@ -325,6 +325,12 @@ treemap-beta
         "Shoes": 25
 ```
 
+### Mermaid version
+
+```mermaid
+info
+```
+
 ### Hand-drawn look + init directive
 
 ```mermaid
@@ -337,9 +343,9 @@ flowchart LR
   A[Idea] --> B[Sketch] --> C[Ship]
 ```
 
-## Newer types (Mermaid 12)
+## More examples
 
-GitHub's own renderer may show an error for these; Mermaid Lens bundles Mermaid 12, so it can still draw most of them.
+Mermaid Lens uses its bundled Mermaid 12.3 and ZenUML renderers. GitHub may show a render error for newer syntax when the extension is disabled.
 
 ### Venn diagram
 
@@ -390,7 +396,100 @@ treeView-beta
     detector.ts
 ```
 
-### ZenUML (needs an external plugin)
+### Swimlanes
+
+```mermaid
+swimlane-beta LR
+  subgraph Design
+    Draft[Draft mockup]
+  end
+  subgraph Engineering
+    Build[Build screen]
+    Review[Review implementation]
+  end
+  Draft --> Build --> Review
+```
+
+### UML use case
+
+```mermaid
+usecase-beta
+  actor Reader
+  Browse("Browse catalogue")
+  Save("Save a title")
+  Reader --> Browse
+  Reader --> Save
+```
+
+### Event modeling
+
+```mermaid
+eventmodeling
+  tf 01 ui LoanForm
+  tf 02 cmd BorrowBook
+  tf 03 evt BookBorrowed
+```
+
+### Cynefin framework
+
+```mermaid
+cynefin-beta
+  title Improving search
+  clear
+    "Fix a broken link"
+  complicated
+    "Tune query performance"
+  complex
+    "Learn what readers search for"
+  chaotic
+    "Restore the search service"
+```
+
+### Agentflow
+
+```mermaid
+---
+title: Book recommendations
+---
+%% A simple recommendation flow
+agentflow LR
+  A([Start]) --> B[Read the request]
+  B --> C[Suggest a title]
+  C --> D([Done])
+```
+
+### Railroad diagram
+
+```mermaid
+railroad-beta
+  greeting = sequence(terminal("hello"), choice(terminal("reader"), terminal("writer")));
+```
+
+### Railroad diagram (EBNF)
+
+```mermaid
+railroad-ebnf-beta
+  integer = [ sign ], digit, { digit };
+  sign = "+" | "-";
+  digit = "0" | "1";
+```
+
+### Railroad diagram (ABNF)
+
+```mermaid
+railroad-abnf-beta
+  word = 1*letter;
+  letter = %x41-5A / %x61-7A;
+```
+
+### Railroad diagram (PEG)
+
+```mermaid
+railroad-peg-beta
+  Answer <- "yes" / "no";
+```
+
+### ZenUML
 
 ```mermaid
 zenuml

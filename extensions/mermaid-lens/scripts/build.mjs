@@ -3,6 +3,7 @@
 //   node scripts/build.mjs --watch   rebuild on change
 import * as esbuild from 'esbuild';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,6 +26,12 @@ async function copyStatic() {
   const mermaidRoot = path.dirname(fileURLToPath(import.meta.resolve('mermaid/package.json')));
   await cp(path.join(mermaidRoot, 'dist/mermaid.min.js'), path.join(dist, 'vendor/mermaid.min.js'));
   await cp(path.join(mermaidRoot, 'LICENSE'), path.join(dist, 'vendor/MERMAID-LICENSE.txt'));
+  const zenumlPackage = '@mermaid-js/mermaid-zenuml/package.json';
+  const zenumlRoot = path.dirname(fileURLToPath(import.meta.resolve(zenumlPackage)));
+  await cp(path.join(zenumlRoot, 'dist/mermaid-zenuml.min.js'), path.join(dist, 'vendor/mermaid-zenuml.min.js'));
+  await cp(path.join(zenumlRoot, 'LICENSE'), path.join(dist, 'vendor/MERMAID-ZENUML-LICENSE.txt'));
+  const zenumlCore = createRequire(path.join(zenumlRoot, 'package.json')).resolve('@zenuml/core');
+  await cp(path.resolve(path.dirname(zenumlCore), '../LICENSE'), path.join(dist, 'vendor/ZENUML-CORE-LICENSE.txt'));
 }
 
 const options = {

@@ -28,6 +28,8 @@ await page.waitForTimeout(15000);
 const raw = await context.newPage();
 await raw.goto('https://github.com/raw/x');
 await raw.addScriptTag({ path: path.join(dist, 'vendor/mermaid.min.js') });
+await raw.addScriptTag({ path: path.join(dist, 'vendor/mermaid-zenuml.min.js') });
+await raw.evaluate(() => mermaid.registerExternalDiagrams([globalThis['mermaid-zenuml']], { lazyLoad: true }));
 const modes = {};
 for (const s of samples) {
   modes[s.key] = await raw.evaluate(async (code) => {
