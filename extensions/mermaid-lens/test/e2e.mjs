@@ -464,6 +464,15 @@ await step('sequence highlighting selects an exchange, a decision, or one nested
   await setStorage({ highlight: true, highlightMode: 'neighbors', direction: 'both' });
   await sequence.locator('[data-act="cycle-highlight"][data-state="neighbors"]').waitFor();
 
+  const guardWeights = () => sequence.locator('text.ml-sequence-guard').evaluateAll((labels) =>
+    labels.map((label) => getComputedStyle(label).fontWeight),
+  );
+  const originalWeights = await guardWeights();
+  assert.ok(originalWeights.length > 0);
+  await guard('cache hit').hover();
+  assert.deepEqual(await lit(), ['Render cached']);
+  assert.deepEqual(await guardWeights(), originalWeights);
+
   await message('GET /items').hover();
   assert.deepEqual(await lit(), ['GET /items']);
   assert.equal(await sequence.locator('.ml-edge.ml-on').count(), 1);
@@ -482,6 +491,7 @@ await step('sequence highlighting selects an exchange, a decision, or one nested
   await sequence.locator('[data-act="cycle-highlight"][data-state="flow"]').waitFor();
   await guard('no entry').click();
   assert.deepEqual(await lit(), ['Open page', 'GET /items', '200 OK', 'Load items', 'Fresh items', 'Render fresh', 'Confirm page']);
+  assert.deepEqual(await guardWeights(), originalWeights);
   await sequence.screenshot({ path: path.join(shots, 'sequence-highlight.png') });
   await setStorage({ direction: 'down' });
   await sequence.locator('[data-act="set-direction"][data-val="down"][aria-checked="true"]').waitFor({ state: 'attached' });

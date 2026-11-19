@@ -378,7 +378,6 @@ svg .ml-sequence-participant.ml-on :is(rect, circle, line, polygon, path) {
   stroke-opacity: 1;
 }
 svg .ml-sequence-divider.ml-on { stroke-width: 2px !important; }
-svg .ml-sequence-guard.ml-on { font-weight: 650 !important; }
 
 /* ---------- diagram: flowing edges ---------- */
 svg.ml-flowing:not(.ml-has-hl) .ml-edge,
